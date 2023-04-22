@@ -9,7 +9,8 @@
 #include "vm/vm.h"
 #endif
 
-
+extern struct list ready_list;
+extern struct list sleep_list;
 /* States in a thread's life cycle. */
 enum thread_status {
 	THREAD_RUNNING,     /* Running thread. */
@@ -91,7 +92,7 @@ struct thread {
 	enum thread_status status;          /* Thread state. */
 	char name[16];                      /* Name (for debugging purposes). */
 	int priority;                       /* Priority. */
-
+	int64_t wake_time;
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 

@@ -1,0 +1,27 @@
+FAIL
+Kernel panic in run: PANIC at ../../threads/thread.c:269 in thread_current(): assertion `t->status == THREAD_RUNNING' failed.
+Call stack: 0x8004213405 0x8004206ed7 0x8004209f88 0x8004216493 0x80042165b1 0x8004210908 0x8004208a7d 0x80042088f1 0x8004208cd8 0x8004209900 0x8004209d55 0x80042164ca 0x80042165b1 0x8004210908 0x8004208a7d 0x80042088f1 0x8004208cd8 0x8004213c18 0x8004213cc0 0x8004209a5e 0x8004209f1f 0x8004218e87 0x8004207349
+Translation of call stack:
+0x0000008004213405: debug_panic (lib/kernel/debug.c:32)
+0x0000008004206ed7: thread_current (threads/thread.c:271)
+0x0000008004209f88: lock_held_by_current_thread (threads/synch.c:236)
+0x0000008004216493: acquire_console (lib/kernel/console.c:87)
+0x00000080042165b1: vprintf (lib/kernel/console.c:122)
+0x0000008004210908: printf (lib/stdio.c:80)
+0x0000008004208a7d: intr_dump_frame (threads/interrupt.c:387)
+0x00000080042088f1: intr_handler (threads/interrupt.c:361)
+0x0000008004208cd8: intr_entry (threads/intr-stubs.o:?)
+0x0000008004209900: sema_down (threads/synch.c:68)
+0x0000008004209d55: lock_acquire (threads/synch.c:192)
+0x00000080042164ca: acquire_console (lib/kernel/console.c:92)
+0x00000080042165b1: vprintf (lib/kernel/console.c:122)
+0x0000008004210908: printf (lib/stdio.c:80)
+0x0000008004208a7d: intr_dump_frame (threads/interrupt.c:387)
+0x00000080042088f1: intr_handler (threads/interrupt.c:361)
+0x0000008004208cd8: intr_entry (threads/intr-stubs.o:?)
+0x0000008004213c18: list_remove (lib/kernel/list.c:242)
+0x0000008004213cc0: list_pop_front (lib/kernel/list.c:254)
+0x0000008004209a5e: sema_up (threads/synch.c:113)
+0x0000008004209f1f: lock_release (threads/synch.c:227)
+0x0000008004218e87: simple_thread_func (tests/threads/priority-fifo.c:97 (discriminator 3))
+0x0000008004207349: kernel_thread (threads/thread.c:433)

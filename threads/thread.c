@@ -26,7 +26,8 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+struct list ready_list;
+struct list sleep_list;
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -108,6 +109,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&sleep_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -305,6 +307,43 @@ thread_yield (void) {
 	if (curr != idle_thread)
 		list_push_back (&ready_list, &curr->elem);
 	do_schedule (THREAD_READY);
+	intr_set_level (old_level);
+}
+/* Yields the CPU.  The current thread is not put to sleep and
+   may be scheduled again immediately at the scheduler's whim. */
+void
+thread_sleep (int64_t wake_time) {
+	struct thread *target = thread_current ();
+	enum intr_level old_level;
+
+	ASSERT (!intr_context ());
+
+	old_level = intr_disable ();
+	if (target != idle_thread)
+	{
+		target->wake_time = wake_time;
+		struct list_elem *e;
+		/* search the threads in sleep_list */	
+		if (!list_empty (&sleep_list))
+		{
+ 			for (e = list_begin (&sleep_list); e != list_end (&sleep_list); e = list_next (e)) 
+			{
+				struct thread *curr = list_entry (e, struct thread, elem);
+				if (curr->wake_time >= wake_time)
+				{
+					list_insert (e, &target->elem);
+					break;
+				}
+ 			}
+		}
+		else
+			list_push_front(&sleep_list, &target->elem);
+
+		do_schedule (THREAD_BLOCKED);
+	}
+	else
+		do_schedule (THREAD_READY);
+	
 	intr_set_level (old_level);
 }
 
