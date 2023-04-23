@@ -1,0 +1,9 @@
+{
+    "files.associations": {
+        "interrupt.h": "c",
+        "random.h": "c",
+        "initializer_list": "c",
+        "limits": "c",
+        "type_traits": "c"
+    }
+}

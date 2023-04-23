@@ -1,0 +1,36 @@
+Traceback (most recent call last):
+  File "/home/ubuntu/pintos-kaist/utils/pintos", line 6, in <module>
+    import tempfile
+  File "/usr/lib/python3.6/tempfile.py", line 44, in <module>
+    import shutil as _shutil
+  File "/usr/lib/python3.6/shutil.py", line 22, in <module>
+    import bz2
+  File "/usr/lib/python3.6/bz2.py", line 19, in <module>
+    from threading import RLock
+  File "/usr/lib/python3.6/threading.py", line 7, in <module>
+    from traceback import format_exc as _format_exc
+  File "/usr/lib/python3.6/traceback.py", line 5, in <module>
+    import linecache
+  File "/usr/lib/python3.6/linecache.py", line 11, in <module>
+    import tokenize
+  File "/usr/lib/python3.6/tokenize.py", line 37, in <module>
+    cookie_re = re.compile(r'^[ \t\f]*#.*?coding[:=][ \t]*([-\w.]+)', re.ASCII)
+  File "/usr/lib/python3.6/re.py", line 233, in compile
+    return _compile(pattern, flags)
+  File "/usr/lib/python3.6/re.py", line 301, in _compile
+    p = sre_compile.compile(pattern, flags)
+  File "/usr/lib/python3.6/sre_compile.py", line 566, in compile
+    code = _code(p, flags)
+  File "/usr/lib/python3.6/sre_compile.py", line 551, in _code
+    _compile(code, p.data, flags)
+  File "/usr/lib/python3.6/sre_compile.py", line 126, in _compile
+    _compile(code, av[2], flags)
+  File "/usr/lib/python3.6/sre_compile.py", line 72, in _compile
+    if (flags & SRE_FLAG_IGNORECASE and
+  File "/usr/lib/python3.6/enum.py", line 806, in __and__
+    return self.__class__(self._value_ & self.__class__(other)._value_)
+  File "/usr/lib/python3.6/enum.py", line 293, in __call__
+    return cls.__new__(cls, value)
+  File "/usr/lib/python3.6/enum.py", line 521, in __new__
+    if type(value) is cls:
+KeyboardInterrupt

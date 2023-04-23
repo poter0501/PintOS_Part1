@@ -90,11 +90,17 @@ timer_elapsed (int64_t then) {
 /* Suspends execution for approximately TICKS timer ticks. */
 void
 timer_sleep (int64_t ticks) {
+	// 원문
 	int64_t start = timer_ticks ();
-
 	ASSERT (intr_get_level () == INTR_ON);
-	while (timer_elapsed (start) < ticks)
-		thread_yield ();
+
+	// while (timer_elapsed (start) < ticks){
+	// 	thread_yield ();
+	// }
+
+	// 내용 추가
+	thread_sleep(start+ticks);
+		
 }
 
 /* Suspends execution for approximately MS milliseconds. */
@@ -120,12 +126,17 @@ void
 timer_print_stats (void) {
 	printf ("Timer: %"PRId64" ticks\n", timer_ticks ());
 }
-
+
 /* Timer interrupt handler. */
+// 매 순간마다 실행
+// waiting que를 구현하면
 static void
 timer_interrupt (struct intr_frame *args UNUSED) {
+	// 원문
 	ticks++;
 	thread_tick ();
+	// 내용 추가
+	thread_wake(ticks);
 }
 
 /* Returns true if LOOPS iterations waits for more than one timer

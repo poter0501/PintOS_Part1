@@ -26,7 +26,11 @@
 
 /* List of processes in THREAD_READY state, that is, processes
    that are ready to run but not actually running. */
-static struct list ready_list;
+static struct list ready_list; /* ready_que */
+
+// 내용 추가
+static struct list wait_list; /* suspend_que */
+
 
 /* Idle thread. */
 static struct thread *idle_thread;
@@ -62,6 +66,11 @@ static void init_thread (struct thread *, const char *name, int priority);
 static void do_schedule(int status);
 static void schedule (void);
 static tid_t allocate_tid (void);
+
+// 내용 추가
+void thread_wake(int64_t ticks);
+void thread_sleep(int64_t ticks);
+
 
 /* Returns true if T appears to point to a valid thread. */
 #define is_thread(t) ((t) != NULL && (t)->magic == THREAD_MAGIC)
@@ -108,6 +117,7 @@ thread_init (void) {
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
 	list_init (&ready_list);
+	list_init (&wait_list);
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -292,6 +302,8 @@ thread_exit (void) {
 	NOT_REACHED ();
 }
 
+
+
 /* Yields the CPU.  The current thread is not put to sleep and
    may be scheduled again immediately at the scheduler's whim. */
 void
@@ -307,6 +319,91 @@ thread_yield (void) {
 	do_schedule (THREAD_READY);
 	intr_set_level (old_level);
 }
+
+// 내용 추가
+// timer_sleep에 삽입
+void
+thread_sleep(int64_t local_ticks){
+	struct thread *curr = thread_current(); // 현재 RUNNING 쓰레드
+	enum intr_level old_level; // 인터럽트 상태
+	ASSERT (!intr_context ());
+
+	old_level = intr_disable (); // 인터럽트 종료
+	
+	// 유휴 상태가 아닌 경우
+	if (curr != idle_thread){
+		curr->awake_tick = local_ticks;
+		list_push_back(&wait_list,&curr->elem);
+		do_schedule (THREAD_BLOCKED);
+	} 
+
+	// 유휴 상태인 경우
+	else{
+		do_schedule (THREAD_READY);
+	}
+
+	// 인터럽트 실행
+	intr_set_level (old_level);
+	
+}
+
+// 내용 추가
+// timer_interrupt에 삽입
+// void thread_wake(int64_t global_ticks){
+// 	enum intr_level old_level;
+
+// 	// 인터럽트 종료
+// 	old_level = intr_disable ();
+
+// 	struct thread *result;
+// 	for (struct list_elem *temp = list_begin(&wait_list); temp != list_end(&wait_list); temp = temp->prev){
+// 		result = list_entry(temp,struct thread,elem);
+// 		// ready 상태 전
+// 		if(result->awake_tick > global_ticks){
+// 			continue;
+// 		}
+
+// 		// ready 상태 후
+// 		else{
+// 			// wait_list에서 삭제
+// 			result->status = THREAD_READY;
+// 			list_remove(&result->elem);
+			
+// 			// ready_list에 넣기
+// 			list_push_back(&ready_list,&result->elem);
+// 		}		
+// 	}
+// 	intr_set_level (old_level);
+// }
+
+
+void thread_wake(int64_t global_ticks){
+	enum intr_level old_level;
+
+	// 인터럽트 종료
+	old_level = intr_disable ();
+
+	struct thread *result;
+	struct list_elem *temp = list_begin(&wait_list);
+	while (temp != list_end(&wait_list)){
+		result = list_entry(temp, struct thread, elem);
+		// ready 상태 전
+		if(result->awake_tick > global_ticks){
+			temp = temp->next;
+			continue;
+		}
+		// ready 상태 후
+			// wait_list에서 삭제
+			result->status = THREAD_READY;
+			list_remove(temp);
+			// ready_list에 넣기
+			list_push_back(&ready_list,&result->elem);
+			temp = list_begin(&wait_list);		
+	}
+	// 인터럽트 실행
+	intr_set_level (old_level);
+}
+
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
@@ -538,8 +635,8 @@ do_schedule(int status) {
 	schedule ();
 }
 
-static void
-schedule (void) {
+
+static void schedule (void) {
 	struct thread *curr = running_thread ();
 	struct thread *next = next_thread_to_run ();
 
