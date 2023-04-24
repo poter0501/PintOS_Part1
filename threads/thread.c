@@ -90,6 +90,15 @@ value_more_priority (const struct list_elem *a_, const struct list_elem *b_,
   return a->priority > b->priority;
 }
 static bool
+value_less_priority (const struct list_elem *a_, const struct list_elem *b_,
+            void *aux UNUSED) 
+{
+  const struct thread *a = list_entry (a_, struct thread, elem);
+  const struct thread *b = list_entry (b_, struct thread, elem);
+  
+  return a->priority < b->priority;
+}
+static bool
 value_less_wakeup_ticks (const struct list_elem *a_, const struct list_elem *b_,
             void *aux UNUSED) 
 {
@@ -225,9 +234,17 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	
 	/* Add to run queue. */
 	thread_unblock (t);
-
+	/* If created thread's priority is bigger than current running thread,
+	the created thread run immediately.
+	Current running threads go to ready list in THREAD_READY status */
+	struct thread *curr = thread_current ();
+	int curr_priority = thread_get_priority();
+	if (curr != idle_thread && priority > curr_priority)
+		thread_yield();
+	
 	return tid;
 }
 
@@ -263,6 +280,12 @@ thread_unblock (struct thread *t) {
 	ASSERT (t->status == THREAD_BLOCKED);
 	list_push_back (&ready_list, &t->elem);
 	t->status = THREAD_READY;
+
+	struct thread *curr = thread_current ();
+	int curr_priority = thread_get_priority();
+	if (curr != idle_thread && t->priority > curr_priority)
+		thread_yield();
+
 	intr_set_level (old_level);
 }
 
@@ -369,14 +392,29 @@ thread_ready (int64_t ticks) {
 		else /* 오름차순이기 때문에 조건을 만족하지 못하는 하나의 thread가 발견되면 그 이후의 wait thread들은 검색 필요가 없다 */
 			break;
 	}
-	/* 우선순위 순으로 ready list 정렬 */
+	/* 우선순위 순으로 ready list 정렬  */
 	list_sort (&ready_list, value_more_priority, NULL);
+	if (thread_current () != idle_thread && !list_empty(&ready_list))
+	{
+		int priority_curr = thread_get_priority();
+		struct thread *high_priority_thread = list_entry(list_begin(&ready_list), struct thread, elem);
+		int high_in_ready = high_priority_thread->priority;
+		if (priority_curr < high_in_ready)
+			thread_yield();
+	}
 }
 
 /* Sets the current thread's priority to NEW_PRIORITY. */
 void
 thread_set_priority (int new_priority) {
 	thread_current ()->priority = new_priority;
+	
+	if (thread_current () != idle_thread)
+	{
+		struct thread *high_priority = list_entry(list_max(&ready_list, value_less_priority, NULL), struct thread, elem);
+		if (new_priority < high_priority->priority)
+			thread_yield();
+	}
 }
 
 /* Returns the current thread's priority. */
@@ -486,6 +524,8 @@ next_thread_to_run (void) {
 	if (list_empty (&ready_list))
 		return idle_thread;
 	else
+		/* find the highest priority thread*/
+		list_sort (&ready_list, value_more_priority, NULL);
 		return list_entry (list_pop_front (&ready_list), struct thread, elem);
 }
 
