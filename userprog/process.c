@@ -164,6 +164,18 @@ int
 process_exec (void *f_name) {
 	char *file_name = f_name;
 	bool success;
+	char *parsed_str[10];
+
+	/* parsing the file_name variable */
+   	char *token, *save_ptr;
+	token = strtok_r (file_name, " ", &save_ptr);
+	parsed_str[0]=token;
+	int idx=1;
+   	for (token = strtok_r (NULL, " ", &save_ptr); token != NULL; token = strtok_r (NULL, " ", &save_ptr))
+   	{
+		parsed_str[idx] = token;
+		idx++;
+   	}
 
 	/* We cannot use the intr_frame in the thread structure.
 	 * This is because when current thread rescheduled,
@@ -172,6 +184,10 @@ process_exec (void *f_name) {
 	_if.ds = _if.es = _if.ss = SEL_UDSEG;
 	_if.cs = SEL_UCSEG;
 	_if.eflags = FLAG_IF | FLAG_MBS;
+	/* save the start address of parsed_str chr pointer array to %rsi*/
+	_if.R.rsi = parsed_str;
+	_if.R.rdi = idx;
+
 
 	/* We first kill the current context */
 	process_cleanup ();
@@ -201,6 +217,11 @@ process_exec (void *f_name) {
  * does nothing. */
 int
 process_wait (tid_t child_tid UNUSED) {
+	while (1)
+	{
+		/* for waiting process exit */
+	}
+	
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
@@ -416,6 +437,47 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	/* TODO: Your code goes here.
 	 * TODO: Implement argument passing (see project2/argument_passing.html). */
+	char **argv;
+	argv = (char **)if_->R.rsi;
+	uintptr_t rsp = if_->rsp;
+	char *arg;
+	int total_size = 0;
+	/* arg 값을 rsp를 활용해서 user stack에 저장 */
+	/* 
+	1. arg의 string 값들을 저장 
+	2. align 조건 만족
+	3. 1번에서 저장한 string 값들의 시작 주소를 저장 (argv[0] ~ argv[n]=0)
+	4. rsi 값 변경
+	5. fake return address 설정
+	*/
+	for (int i = if_->R.rdi-1; i >=0; i--)
+	{
+		arg = *(argv+i);
+		int arg_size = strlen(arg)+1;
+		total_size += arg_size;
+		strlcpy (rsp-arg_size, arg, arg_size);
+		rsp-=arg_size;
+		*(argv+i) = rsp;
+	}
+
+	int word_align = 8 - total_size%8;
+	memset(rsp-word_align, 0, word_align);
+	rsp-=word_align;
+	memset(rsp-sizeof(char*), 0, sizeof(char*));
+	rsp-=sizeof(char*);
+
+	for (int i = if_->R.rdi-1; i >=0; i--)
+	{
+		arg = argv+i;
+		strlcpy (rsp-sizeof(char*), arg, sizeof(char*));
+		rsp-=sizeof(char*);
+	}
+	if_->R.rsi = rsp; 
+
+	memset(rsp-sizeof(void*), 0, sizeof(void*));
+	rsp-=sizeof(void*);
+	if_->rsp = rsp;
+	hex_dump(if_->rsp , if_->rsp , USER_STACK - if_->rsp ,true);
 
 	success = true;
 
