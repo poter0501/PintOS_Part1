@@ -158,11 +158,50 @@ error:
 	thread_exit ();
 }
 
+void
+argument_stack (char **args, int idx, struct intr_frame *if_) {
+	// stack 시작 주소부터 args[idx]를 하나씩 쌓기
+	// if_.rsp에서 시작해서 차례대로 
+	int i = 0;
+	uintptr_t p = if_->rsp;
+	char *stk_ptr[idx+2];
+	memset(stk_ptr, 0, sizeof(stk_ptr));
+
+	for (; idx > -1; idx--) {
+		p = p - strlen(args[idx]) - 1;
+		stk_ptr[i++] = (char *)p;
+		strlcpy(p, args[idx], strlen(args[idx]) + 1);
+	}
+	
+	// stack 주소 8의 배수로
+	for (p = p - 1;p % 8 != 0; p--) {
+		memset(p, 0, 1);
+	}
+	if_->rsp = p;
+	i--;
+
+	memset (if_->rsp - sizeof(char *), 0, sizeof(char *));
+	p = p - sizeof(char *);
+
+	//memcpy(p - (i + 1) * sizeof(char *), stk_ptr, (i + 1) * sizeof(char *));
+	int j = 0;
+	for (p = p - sizeof(char *); j <= i; j++) {
+		char *temp = &stk_ptr[j];
+		memcpy(p, &stk_ptr[j], sizeof(char *));
+		p = p - sizeof(char *);
+	}
+	memset(p, 0, sizeof(char *));
+
+	if_->rsp = p;
+}
+
+#define MAX_ARG 128
 /* Switch the current execution context to the f_name.
  * Returns -1 on fail. */
 int
 process_exec (void *f_name) {
 	char *file_name = f_name;
+	char *token, *save_ptr, *args[MAX_ARG];
 	bool success;
 
 	/* We cannot use the intr_frame in the thread structure.
@@ -176,8 +215,21 @@ process_exec (void *f_name) {
 	/* We first kill the current context */
 	process_cleanup ();
 
+	/* f_name을 공백으로 나누어 배열로 만든다. */
+	int idx = 0;
+	memset(args, 0, sizeof(args));
+	
+	for (token = strtok_r(file_name, " ", &save_ptr); token != NULL && idx < MAX_ARG; token = strtok_r (NULL, " ", &save_ptr)) {
+		// args에 저장한다
+		args[idx] = token;
+		idx++;
+	}
+
 	/* And then load the binary */
 	success = load (file_name, &_if);
+	argument_stack (args, idx - 1, &_if);
+
+	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
@@ -188,7 +240,6 @@ process_exec (void *f_name) {
 	do_iret (&_if);
 	NOT_REACHED ();
 }
-
 
 /* Waits for thread TID to die and returns its exit status.  If
  * it was terminated by the kernel (i.e. killed due to an
@@ -204,6 +255,9 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
+	while(1){
+		
+	}
 	return -1;
 }
 

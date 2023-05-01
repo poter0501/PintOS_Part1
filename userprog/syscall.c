@@ -41,6 +41,12 @@ syscall_init (void) {
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
+	check_address ();
+
 	printf ("system call!\n");
 	thread_exit ();
+}
+
+void check_address (void *addr) {
+	
 }
