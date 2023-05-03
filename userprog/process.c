@@ -208,7 +208,7 @@ process_exec (void *f_name) {
 		return -1;
 
 	/* hex dump check */
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
 	/* Start switched process. */
 	do_iret (&_if);
@@ -232,7 +232,8 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	while (1){}
+	for (int i = 0; i < 100000000; i++);
+	
 	return -1;
 }
 
@@ -244,7 +245,7 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	
 	process_cleanup ();
 }
 
@@ -252,6 +253,7 @@ process_exit (void) {
 static void
 process_cleanup (void) {
 	struct thread *curr = thread_current ();
+	process_close_all_file_and_free();
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
@@ -344,7 +346,56 @@ static bool validate_segment (const struct Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
+int process_add_file(struct file *f);
+struct file *process_get_file(int fd);
+void process_close_file(int fd);
+void process_close_all_file_and_free();
 
+/* Project2 syscall - file */
+int process_add_file(struct file *f)
+{
+	/* Add file to file descriptor table */
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	int fd = curr->next_fd; 
+	*(fdt + fd) = f;
+	/* Increse the next_fd */
+	curr->next_fd += 1;
+	return fd;
+}
+struct file *process_get_file(int fd)
+{
+	/* return file, 
+	if fd is not have a file, return NULL */
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	struct file *file = *(fdt + fd);
+	/* Is it need? */
+	if (file==NULL)
+		return NULL;
+	
+	return file;
+}
+void process_close_file(int fd)
+{
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	struct file *file = *(fdt + fd);
+	/* Close the file */
+	file_close(file); /* free file */
+	/* Initialize the table entry */
+	*(fdt + fd) = NULL;
+}
+void process_close_all_file_and_free()
+{
+	struct thread *curr = thread_current();
+	int next_fd = curr->next_fd;
+	for (int fd = 2; fd < next_fd; fd++)
+	{
+		process_close_file(fd);
+	}
+	
+}
 // 내용 수정
 /* Push Argument Stack */
 void argument_stack(char **parse ,int count , void **rsp){

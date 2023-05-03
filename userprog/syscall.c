@@ -7,9 +7,28 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "userprog/process.h"
+#include <string.h>
+#include "threads/synch.h"
+#include "filesys/filesys.h"
+
+struct lock filesys_lock;
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
+
+void check_address(void *addr);
+void halt (void);
+void exit (int status);
+bool create (const char *file, unsigned initial_size);
+bool remove (const char *file);
+int open (const char *file);
+int filesize (int fd);
+int read (int fd, void *buffer, unsigned size);
+int write (int fd, const void *buffer, unsigned size);
+void seek (int fd, unsigned position);
+unsigned tell (int fd);
+void close (int fd);
 
 /* System call.
  *
@@ -35,19 +54,231 @@ syscall_init (void) {
 	 * mode stack. Therefore, we masked the FLAG_FL. */
 	write_msr(MSR_SYSCALL_MASK,
 			FLAG_IF | FLAG_TF | FLAG_DF | FLAG_IOPL | FLAG_AC | FLAG_NT);
+	lock_init(&filesys_lock);
 }
 
 /* The main system call interface */
 void
 syscall_handler (struct intr_frame *f UNUSED) {
 	// TODO: Your implementation goes here.
-	printf ("system call!\n");
+	// printf ("system call!\n");
 
-	// 시스템 콜(halt, exit,create, remove)을 구현하고 시스템 콜 핸들러를 통해 호출
+	uintptr_t rsp = f->rsp;
+	uint64_t syscall_number = f->R.rax;
 
-	thread_exit ();
+	/* Check the stack pointer point to user area */
+	check_address(rsp);
+	/* If the arguments that saved in user area are pointer type, 
+	check the address is point to user area. */
+	// get_argument(f);
+	/* 시스템 콜 핸들러 syscall_handler() 가 제어권을 얻으면 시스템 콜 번호는 rax 에 있고, 
+	인자는 %rdi, %rsi, %rdx, %r10, %r8, %r9 순서로 전달됩니다. */
+	/* 함수 리턴 값을 위한 x86-64의 관례는 그 값을 RAX 레지스터에 넣는 것 입니다. 
+	값을 리턴하는 시스템 콜도 struct intr_frame의  rax 멤버를 수정하는 식으로 이 관례를 따를 수 있습니다. */
+
+	switch (syscall_number)
+	{
+	case SYS_HALT:
+		halt();
+		break;
+	case SYS_EXIT:
+		exit((int)f->R.rdi);
+		break;
+	case SYS_FORK:
+		/* code */
+		break;
+	case SYS_EXEC:
+		/* code */
+		break;
+	case SYS_WAIT:
+		/* code */
+		break;
+	case SYS_CREATE:
+		f->R.rax = create((char*)f->R.rdi, f->R.rsi);
+		break;
+	case SYS_REMOVE:
+		f->R.rax = remove ((char*)f->R.rdi);
+		break;
+	case SYS_OPEN:
+		f->R.rax = open((char*)f->R.rdi);
+		break;
+	case SYS_FILESIZE:
+		f->R.rax = filesize(f->R.rdi);
+		break;
+	case SYS_READ:
+		f->R.rax = read(f->R.rdi, (char*)f->R.rsi, f->R.rdx);
+		break;
+	case SYS_WRITE:
+		f->R.rax = write(f->R.rdi, (char*)f->R.rsi, f->R.rdx);
+		break;
+	case SYS_SEEK:
+		seek(f->R.rdi, f->R.rsi);
+		break;
+	case SYS_TELL:
+		f->R.rax = tell(f->R.rdi);
+		break;
+	case SYS_CLOSE:
+		close(f->R.rdi);
+		break;
+	default:
+		thread_exit ();
+		break;
+	}
 }
+void check_address(void *addr)
+{
+	/* Check the addr is valid address(is in user area). */
+	/* if not, exit the process. */
+	if (!is_user_vaddr(addr))
+	{
+		exit(-1);
+	}
+}
+void get_argument(struct intr_frame *f)
+{
+	/* Copy the arguments in the user stack area to kernel area. */
+	/* Check the address that arguments saved is user area */
+	/* 시스템 콜 핸들러 syscall_handler() 가 제어권을 얻으면 시스템 콜 번호는 rax 에 있고, 
+	인자는 %rdi, %rsi, %rdx, %r10, %r8, %r9 순서로 전달됩니다. */
+	/* 함수 리턴 값을 위한 x86-64의 관례는 그 값을 RAX 레지스터에 넣는 것 입니다. 
+	값을 리턴하는 시스템 콜도 struct intr_frame의  rax 멤버를 수정하는 식으로 이 관례를 따를 수 있습니다. */
+	void *rsp = f->rsp; 
+	
+	f->R.rax = *(char*)rsp; // return address
+	rsp -= sizeof(void*);
 
+	char *arg_ptr;
+	int count = f->R.rdi;
 
+	for (int i = 0; i < count; i++)
+	{
+		arg_ptr = *(char*)rsp; 
+		check_address(arg_ptr);
+		switch (i)
+		{
+		case 0:
+			f->R.rdi = *arg_ptr;
+			break;
+		case 1:
+			f->R.rsi = *arg_ptr;
+			break;
+		case 2:
+			f->R.rdx = *arg_ptr;
+			break;
+		case 3:
+			f->R.r10 = *arg_ptr;
+			break;
+		case 4:
+			f->R.r8 = *arg_ptr;
+			break;
+		case 5:
+			f->R.r9 = *arg_ptr;
+			break;
+		default:
+			break;
+		}
+		rsp-=sizeof(char*);
+	}
+}
+void
+halt (void) {
+	power_off();
+}
+void
+exit (int status) {
+	struct thread *curr = thread_current();
+	/* Save exit status at process descriptor -> ??*/
+	printf("%s: exit(%d)\n", curr->name, status);
+	thread_exit();
+}
+// pid_t exec(const char *cmd_line)
+// {
+// 	/* Create child process and execute program corresponds to cmd_line on it */
+// }
+// int wait(pid_t pid)
+// {
+// 	/* Wait for termination of child whose process id is pid */
 
+// }
+bool
+create (const char *file, unsigned initial_size) {
+	if (file==NULL)
+		exit(-1);
+	return filesys_create (file, initial_size);
+}
+bool
+remove (const char *file) {
+	if (file==NULL)
+		exit(-1);
+	return filesys_remove (file);
+}
+int
+open (const char *file) {
+	if (file==NULL)
+		exit(-1);
+	
+	struct thread *curr = thread_current();
+	struct file *file_added = filesys_open (file);
+	if (file_added==NULL)
+		return -1;
+	
+	int fd = process_add_file(file_added);
+	return fd;
+}
+int
+filesize (int fd) {
+	struct file * file_curr = process_get_file(fd);
+	return file_length (file_curr);
+}
+int
+read (int fd, void *buffer, unsigned size) {
+	struct file *file_curr = process_get_file(fd);
+	lock_acquire(&filesys_lock);
+	int bytes_written;
+	if (fd==0)
+		bytes_written = input_getc(buffer, size);
+	else
+		bytes_written = file_read (file_curr, buffer, size);
+
+	lock_release(&filesys_lock);
+	return bytes_written;
+}
+int
+write (int fd, const void *buffer, unsigned size) {
+
+	struct file *file_curr = process_get_file(fd);
+	int bytes_written;
+	lock_acquire(&filesys_lock);
+	if (fd==1)
+	{
+		putbuf(buffer, size);
+		bytes_written = strlen((char*)buffer);
+		lock_release(&filesys_lock);
+		return bytes_written < size ? bytes_written : size;
+	}
+	else
+	{
+		bytes_written = file_write (file_curr, buffer, size);
+		lock_release(&filesys_lock);
+		return bytes_written;
+	}
+}
+void
+seek (int fd, unsigned position) {
+
+	struct file *file_curr = process_get_file(fd);
+
+	return file_seek (file_curr, position);
+}
+unsigned
+tell (int fd) {
+
+	struct file *file_curr = process_get_file(fd);
+
+	return file_tell (file_curr);
+}
+void
+close (int fd) {
+	process_close_file(fd);
+}
 

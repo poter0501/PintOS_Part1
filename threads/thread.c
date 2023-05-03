@@ -13,6 +13,10 @@
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "./filesys/file.h"
+#include "./filesys/inode.h"
+#include "./filesys/inode.h"
+#include "./filesys/off_t.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -237,7 +241,10 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
-
+	
+	/* Project2 syscall - file */
+	t->fdt = calloc(64, sizeof(struct file*));
+	t->next_fd=2;
 	/* Add to run queue. */
 	thread_unblock (t);
 	
