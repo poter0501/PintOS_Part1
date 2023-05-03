@@ -11,8 +11,12 @@
 #include "threads/synch.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+// 수정
+#include "filesys/file.h"
+
 #ifdef USERPROG
 #include "userprog/process.h"
+
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -238,12 +242,20 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 
+	// Project2 System Call
+	/* fd 값 초기화(0,1은 표준 입력,출력) */
+	t->next_fd = 2;
+	/* File Descriptor 테이블에 메모리 할당 */
+	t->fdt = calloc (64, sizeof (struct file*));
+
 	/* Add to run queue. */
 	thread_unblock (t);
 	
 	// 내용 추가
 	// Project1-2
 	preempt_priority();
+
+
 
 	return tid;
 }
@@ -518,9 +530,14 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
 	// 수정
+	// Project1
 	list_init(&t->donations);
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
+	// 수정
+	// Project2 System Call 
+	/* 자식 리스트 초기화 */
+	list
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

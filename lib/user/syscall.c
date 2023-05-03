@@ -8,7 +8,7 @@ static __inline int64_t syscall (uint64_t num_, uint64_t a1_, uint64_t a2_,
 	int64_t ret;
 	register uint64_t *num asm ("rax") = (uint64_t *) num_;
 	register uint64_t *a1 asm ("rdi") = (uint64_t *) a1_;
-	register uint64_t *a2 asm ("rsi") = (uint64_t *) a2_;
+	register uint64_t *a2 asm ("rsi"    ) = (uint64_t *) a2_;
 	register uint64_t *a3 asm ("rdx") = (uint64_t *) a3_;
 	register uint64_t *a4 asm ("r10") = (uint64_t *) a4_;
 	register uint64_t *a5 asm ("r8") = (uint64_t *) a5_;

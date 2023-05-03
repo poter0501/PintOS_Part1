@@ -3,6 +3,22 @@
         "interrupt.h": "c",
         "hash_map": "c",
         "hash_set": "c",
-        "algorithm": "c"
+        "algorithm": "c",
+        "*.inc": "c",
+        "*.tcc": "c",
+        "fstream": "c",
+        "ostream": "c",
+        "file.h": "c",
+        "syscall.h": "c",
+        "synch.h": "c",
+        "filesys.h": "c",
+        "input.h": "c",
+        "stdio.h": "c",
+        "iosfwd": "c",
+        "istream": "c",
+        "limits": "c",
+        "sstream": "c",
+        "streambuf": "c",
+        "string_view": "c"
     }
 }
