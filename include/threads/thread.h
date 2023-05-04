@@ -5,6 +5,11 @@
 #include <list.h>
 #include <stdint.h>
 #include "threads/interrupt.h"
+#include "threads/synch.h"
+#include "./filesys/file.h"
+#include "./filesys/inode.h"
+#include "./filesys/inode.h"
+#include "./filesys/off_t.h"
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -17,7 +22,6 @@ enum thread_status {
 	THREAD_BLOCKED,     /* Waiting for an event to trigger. */
 	THREAD_DYING        /* About to be destroyed. */
 };
-
 /* Thread identifier type.
    You can redefine this to whatever type you like. */
 typedef int tid_t;
@@ -27,6 +31,8 @@ typedef int tid_t;
 #define PRI_MIN 0                       /* Lowest priority. */
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
+
+#define MAX_FILE_DES_TBL_SIZE 64
 
 /* A kernel thread or user process.
  *
@@ -100,6 +106,18 @@ struct thread {
 
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
+	/* Project2 syscall - process hierachy */
+	struct thread *parent; /* parent thread */
+	struct list child; /* list of child process */
+	struct list_elem child_elem; /* element of child process list */
+	/* Project2 syscall - process flags */
+	int load_status;
+	int exit_status;
+	struct semaphore sema_exit;
+	struct semaphore sema_load;
+	/* Project2 syscall - file */
+	struct file **fdt; /* File descriptor table */
+	int next_fd;
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */

@@ -27,6 +27,14 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
+int process_add_file (struct file *f);
+struct file *process_get_file (int fd);
+void process_close_file (int fd);
+void process_close_all_file_and_free ();
+
+struct thread *get_child_process (int pid);
+void remove_child_process(struct thread *cp);
+
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -196,6 +204,10 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	/* 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
+	struct thread *curr = thread_current();
+	sema_up(&curr->sema_load);
+
 	/*2. Push User Stack*/
 	argument_stack(argv , idx , &_if.rsp);
 	_if.R.rsi = (uint64_t )_if.rsp + 8;
@@ -206,10 +218,18 @@ process_exec (void *f_name) {
 
 	if (!success)
 		return -1;
+	// if (!success)
+	// {
+	// 	/* 메모리에 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패 구현 */
+
+	// 	thread_exit();
+	// }
 
 	/* hex dump check */
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
+	/* 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
+	
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
@@ -233,6 +253,48 @@ process_wait (tid_t child_tid UNUSED) {
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
 	for (int i = 0; i < 100000000; i++);
+
+	/* Exceptions
+	예외 발생시 즉시 -1 리턴
+	1. 자식 프로세스가 exit() 함수를 호출하지 않고,
+	   kernel 의해서 종료된다면(exception), wait(...)은 -1을 반환해야 한다.
+	   -> 프로세스 실행 함수의 마지막 혹은 syscall의 exec 함수의 마지막에 
+	      sema_up을 통해 부모 프로세스에게 신호를 줄텐데
+	      sema_up 까지 도달하지 못하고 죽은 상황을 처리 해줘야 할듯?
+	2. 자식은 상속되지 않는다.
+	   A가 B를 낳고 B가 C를 낳는다면 A가 wait(C) 호출하는 상황은 실패해야 한다.
+	   -> 부모의 자식중에 없다면 -1 을 반환
+	3. 한 자식 프로세서 당 한번만 wait 할 수 있다.
+	   -> 부모가 해당 자식을 이미 wait 중인지 확인하는 로직 필요.
+	   -> wait을 호출한 thread가 해당 자식의 sema_exit의 waiter에 있는지 확인하고 이미 존재하면 -1 return.
+	*/
+
+	/* 자식 프로세스의 프로세스 디스크립터 검색 */
+	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
+	/* 자식 프로세스 디스크립터 삭제 */
+	/* 자식 프로세스의 exit status 리턴 */
+	// struct thread *curr = thread_current();
+	// struct thread *child;
+	// struct list_elem *e;
+	// bool is_exist = 0;
+	// for (e = list_begin(&curr->child); e != list_end(&curr->child); e = list_next(e))
+	// {
+	// 	child = list_entry(e, struct thread, child_elem);
+	// 	if(child->tid == child_tid)
+	// 	{
+	// 		is_exist = 1;
+	// 	}
+	// }
+	// if (is_exist)
+	// {
+	// 	sema_down(&child->sema_exit);
+	// 	int child_exit_status = child->exit_status;
+	// 	/*
+	// 	child process 가 exit 되면 process_cleanup 함수 실행되니까
+	// 	child 프로세스 
+	// 	 */
+	// 	return child_exit_status;
+	// }
 	
 	return -1;
 }
@@ -287,7 +349,79 @@ process_activate (struct thread *next) {
 	/* Set thread's kernel stack for use in processing interrupts. */
 	tss_update (next);
 }
+/* Project2 syscall - process */
+struct thread *get_child_process (int pid)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *e;
+	for (e = list_begin(&curr->child); e != list_end(&curr->child); e = list_next(e))
+	{
+		struct thread *c = list_entry(e, struct thread, child_elem);
+		if(c->tid == pid)
+			return c;
+	}
+	return NULL;
+}
+void remove_child_process(struct thread *cp)
+{
+	struct thread *parent = cp->parent;
+	struct list_elem *e;
+	for (e = list_begin(&parent->child); e != list_end(&parent->child); e = list_next(e))
+	{
+		struct thread *c = list_entry(e, struct thread, child_elem);
+		if(c == cp)
+		{
+			remove(e);
+		}
+	}
+	/* need to do free child structure memory */
+	
+}
 
+/* Project2 syscall - file */
+int process_add_file(struct file *f)
+{
+	/* Add file to file descriptor table */
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	int fd = curr->next_fd; 
+	*(fdt + fd) = f;
+	/* Increse the next_fd */
+	curr->next_fd += 1;
+	return fd;
+}
+struct file *process_get_file(int fd)
+{
+	/* return file, 
+	if fd is not have a file, return NULL */
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	struct file *file = *(fdt + fd);
+	/* Is it need? */
+	if (file==NULL)
+		return NULL;
+	
+	return file;
+}
+void process_close_file(int fd)
+{
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	struct file *file = *(fdt + fd);
+	/* Close the file */
+	file_close(file); /* free file */
+	/* Initialize the table entry */
+	*(fdt + fd) = NULL;
+}
+void process_close_all_file_and_free()
+{
+	struct thread *curr = thread_current();
+	int next_fd = curr->next_fd;
+	for (int fd = 2; fd < next_fd; fd++)
+	{
+		process_close_file(fd);
+	}
+}
 /* We load ELF binaries.  The following definitions are taken
  * from the ELF specification, [ELF1], more-or-less verbatim.  */
 
@@ -346,56 +480,7 @@ static bool validate_segment (const struct Phdr *, struct file *);
 static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		uint32_t read_bytes, uint32_t zero_bytes,
 		bool writable);
-int process_add_file(struct file *f);
-struct file *process_get_file(int fd);
-void process_close_file(int fd);
-void process_close_all_file_and_free();
 
-/* Project2 syscall - file */
-int process_add_file(struct file *f)
-{
-	/* Add file to file descriptor table */
-	struct thread *curr = thread_current();
-	struct file **fdt = curr->fdt;
-	int fd = curr->next_fd; 
-	*(fdt + fd) = f;
-	/* Increse the next_fd */
-	curr->next_fd += 1;
-	return fd;
-}
-struct file *process_get_file(int fd)
-{
-	/* return file, 
-	if fd is not have a file, return NULL */
-	struct thread *curr = thread_current();
-	struct file **fdt = curr->fdt;
-	struct file *file = *(fdt + fd);
-	/* Is it need? */
-	if (file==NULL)
-		return NULL;
-	
-	return file;
-}
-void process_close_file(int fd)
-{
-	struct thread *curr = thread_current();
-	struct file **fdt = curr->fdt;
-	struct file *file = *(fdt + fd);
-	/* Close the file */
-	file_close(file); /* free file */
-	/* Initialize the table entry */
-	*(fdt + fd) = NULL;
-}
-void process_close_all_file_and_free()
-{
-	struct thread *curr = thread_current();
-	int next_fd = curr->next_fd;
-	for (int fd = 2; fd < next_fd; fd++)
-	{
-		process_close_file(fd);
-	}
-	
-}
 // 내용 수정
 /* Push Argument Stack */
 void argument_stack(char **parse ,int count , void **rsp){

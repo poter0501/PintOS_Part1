@@ -242,9 +242,19 @@ thread_create (const char *name, int priority,
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
 	
+	/* Project2 syscall */
+	struct thread *parent = thread_current(); /* parent thread ? */
+	t->parent = parent;
+	t->load_status = 0;
+	t->exit_status = 0;
+	sema_init(&t->sema_exit, 0);
+	sema_init(&t->sema_load, 0);
+	list_push_back (&t->child, &t->child_elem);
+
 	/* Project2 syscall - file */
 	t->fdt = calloc(64, sizeof(struct file*));
 	t->next_fd=2;
+
 	/* Add to run queue. */
 	thread_unblock (t);
 	
@@ -528,6 +538,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->donations);
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
+	/* Project2 syscall - initialize the thread hierachy */
+	list_init(&t->child);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

@@ -11,4 +11,9 @@ void process_exit (void);
 void process_activate (struct thread *next);
 // 내용 수정
 void argument_stack(char **parse ,int count , void **rsp);
+/* Project2 syscall - file */
+int process_add_file(struct file *f);
+struct file *process_get_file(int fd);
+void process_close_file(int fd);
+void process_close_all_file_and_free();
 #endif /* userprog/process.h */

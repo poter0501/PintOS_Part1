@@ -12,14 +12,13 @@
 #include "threads/synch.h"
 #include "filesys/filesys.h"
 
-struct lock filesys_lock;
-
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
 
 void check_address(void *addr);
 void halt (void);
 void exit (int status);
+int fork (const char *thread_name);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
@@ -88,7 +87,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		/* code */
 		break;
 	case SYS_EXEC:
-		/* code */
+		f->R.rax = exec((char*)f->R.rdi);
 		break;
 	case SYS_WAIT:
 		/* code */
@@ -134,52 +133,6 @@ void check_address(void *addr)
 		exit(-1);
 	}
 }
-void get_argument(struct intr_frame *f)
-{
-	/* Copy the arguments in the user stack area to kernel area. */
-	/* Check the address that arguments saved is user area */
-	/* 시스템 콜 핸들러 syscall_handler() 가 제어권을 얻으면 시스템 콜 번호는 rax 에 있고, 
-	인자는 %rdi, %rsi, %rdx, %r10, %r8, %r9 순서로 전달됩니다. */
-	/* 함수 리턴 값을 위한 x86-64의 관례는 그 값을 RAX 레지스터에 넣는 것 입니다. 
-	값을 리턴하는 시스템 콜도 struct intr_frame의  rax 멤버를 수정하는 식으로 이 관례를 따를 수 있습니다. */
-	void *rsp = f->rsp; 
-	
-	f->R.rax = *(char*)rsp; // return address
-	rsp -= sizeof(void*);
-
-	char *arg_ptr;
-	int count = f->R.rdi;
-
-	for (int i = 0; i < count; i++)
-	{
-		arg_ptr = *(char*)rsp; 
-		check_address(arg_ptr);
-		switch (i)
-		{
-		case 0:
-			f->R.rdi = *arg_ptr;
-			break;
-		case 1:
-			f->R.rsi = *arg_ptr;
-			break;
-		case 2:
-			f->R.rdx = *arg_ptr;
-			break;
-		case 3:
-			f->R.r10 = *arg_ptr;
-			break;
-		case 4:
-			f->R.r8 = *arg_ptr;
-			break;
-		case 5:
-			f->R.r9 = *arg_ptr;
-			break;
-		default:
-			break;
-		}
-		rsp-=sizeof(char*);
-	}
-}
 void
 halt (void) {
 	power_off();
@@ -191,15 +144,22 @@ exit (int status) {
 	printf("%s: exit(%d)\n", curr->name, status);
 	thread_exit();
 }
-// pid_t exec(const char *cmd_line)
-// {
-// 	/* Create child process and execute program corresponds to cmd_line on it */
-// }
-// int wait(pid_t pid)
-// {
-// 	/* Wait for termination of child whose process id is pid */
-
-// }
+int
+wait (int pid) {
+	
+}
+int
+exec (const char *file) {
+	/* process_execute() 함수를 호출하여 자식 프로세스 생성 */ 
+	/* 생성된 자식 프로세스의 프로세스 디스크립터를 검색 */
+	/* 자식 프로세스의 프로그램이 적재될 때까지 대기 */
+	/* 프로그램 적재 실패 시 -1 리턴 */
+	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴 */
+}
+int
+fork (const char *thread_name){
+	
+}
 bool
 create (const char *file, unsigned initial_size) {
 	if (file==NULL)
