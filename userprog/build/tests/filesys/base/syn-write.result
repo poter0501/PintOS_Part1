@@ -1,2 +1,20 @@
 FAIL
-run: wait for child 1 of 10 returned 4 (expected 0): FAILED
+Kernel panic in run: PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x8004217ed6 0x800421cc42 0x8004208feb 0x8004209409 0x8004218c5c 0x8004218ff7 0x800420a572 0x800421d3d4 0x800421d05f 0x800421cd96 0x400408 0x40047c 0x4006eb 0x40017e 0x400fa5 0x400fee
+Translation of call stack:
+0x0000008004217ed6: debug_panic (lib/kernel/debug.c:32)
+0x000000800421cc42: kill (userprog/exception.c:103)
+0x0000008004208feb: intr_handler (threads/interrupt.c:352)
+0x0000008004209409: intr_entry (threads/intr-stubs.o:?)
+0x0000008004218c5c: find_end_of_run (lib/kernel/list.c:348 (discriminator 1))
+0x0000008004218ff7: list_sort (lib/kernel/list.c:401)
+0x000000800420a572: lock_acquire (threads/synch.c:219)
+0x000000800421d3d4: write (userprog/syscall.c:222)
+0x000000800421d05f: syscall_handler (userprog/syscall.c:92)
+0x000000800421cd96: no_sti (userprog/syscall-entry.o:?)
+0x0000000000400408: (unknown)
+0x000000000040047c: (unknown)
+0x00000000004006eb: (unknown)
+0x000000000040017e: (unknown)
+0x0000000000400fa5: (unknown)
+0x0000000000400fee: (unknown)

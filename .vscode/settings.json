@@ -19,6 +19,7 @@
         "limits": "c",
         "sstream": "c",
         "streambuf": "c",
-        "string_view": "c"
+        "string_view": "c",
+        "thread.h": "c"
     }
 }

@@ -81,9 +81,13 @@ initd (void *f_name) {
  * TID_ERROR if the thread cannot be created. */
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
+	struct thread *cur = thread_current();
+	memcpy(&cur->parent_if,if_,sizeof(struct intr_frame)); //부모 프로세스 메모리를 복사
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	tid_t tid = thread_create (name,PRI_DEFAULT, __do_fork, thread_current ());
+	struct thread *child_tid = get_child_process(tid);
+	sema_down(&child_tid->fork_sema);
+	return tid;
 }
 
 #ifndef VM
@@ -98,22 +102,28 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kernel_vaddr(va)) return true;
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	newpage = palloc_get_page(PAL_USER);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memcpy(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		return false;
 	}
+
 	return true;
 }
 #endif
@@ -130,10 +140,12 @@ __do_fork (void *aux) {
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if;
 	bool succ = true;
+	parent_if = &parent->parent_if;
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
-
+	if_.R.rax = 0;
+	
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
 	if (current->pml4 == NULL)
@@ -154,8 +166,20 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	
+	// Project2 
+	// Duplicate the file Descriptor.
+	int idx;
+	for (idx = 2; idx < parent->next_fd; idx++){
+		if (parent->fdt[idx]){
+			current->fdt[idx] = file_duplicate(parent->fdt[idx]);
+		}
+	}
+	current->next_fd = parent->next_fd;
 
-	process_init ();
+	// 다 만들어졌으니 sema up
+	sema_up(&current->fork_sema);
+	// process_init ();
 
 	/* Finally, switch to the newly created process. */
 	if (succ)
@@ -232,8 +256,25 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	for(int i=0;i<100000000;i++);
-	return -1;
+
+	// Project2 System Call
+	// Set Process
+	/* 자식 프로세스의 프로세스 디스크립터 검색 */
+	struct thread *child = get_child_process(child_tid);
+
+	/* 자식 프로세스가 없는 경우 -1 리턴 */
+	if (child == NULL) return -1;
+
+	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
+	sema_down(&child->exit_sema);
+
+	/* 자식 프로세스 디스크립터 삭제 */
+	//remove_child_process(&child);
+	list_remove(&child->child_elem);
+
+	/* 자식 프로세스의 exit status 리턴 */
+	return child->exit_status;
+	
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -584,6 +625,36 @@ void process_close_file(int fd)
 	curr->fdt[fd] = 0;
 	
 }
+
+// 내용 수정
+// Project2 System Call
+/* child process start*/
+struct thread *get_child_process (int child_tid)
+{
+	struct thread *current_thread = thread_current(); // 현재 실행 중인 스레드
+	struct list_elem *e;
+
+	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색 */
+	for (e = list_begin(&current_thread->child_list); e != list_end(&current_thread->child_list); e = list_next(e)){
+		struct thread *child = list_entry(e, struct thread, child_elem);
+		if (child->tid == child_tid) return child;
+ 	}
+
+	/* 리스트에 존재하지 않으면 NULL 리턴 */
+	return NULL;
+}
+
+// 내용 수정
+// Project2 System Call
+/* 부모 프로세스의 자식 리스트에서 프로세스 디스크립터 제거 */ 
+void remove_child_process(struct thread *child)
+{
+	/* 자식 리스트에서 제거*/
+	list_remove(&child->child_elem);
+	/* 프로세스 디스크립터 메모리 해제 */
+	free(child);
+}
+
 
 #ifndef VM
 /* Codes of this block will be ONLY USED DURING project 2.

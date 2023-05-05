@@ -17,5 +17,8 @@ void argument_stack(char **parse ,int count , void **rsp);
 int process_add_file (struct file *f);
 struct file *process_get_file(int fd);
 void process_close_file(int fd);
+int process_wait (tid_t child_tid UNUSED);
+struct thread *get_child_process (int child_tid);
+void remove_child_process(struct thread *child);
 
 #endif /* userprog/process.h */

@@ -66,10 +66,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			exit(f->R.rdi);
 			break;             
 		case SYS_FORK:
+			f->R.rax = fork((const char *)f->R.rdi, f);
 			break;
 		case SYS_EXEC:
 			break;   
 		case SYS_WAIT:
+			f->R.rax = wait(f->R.rdi);
 			break; 
 		case SYS_CREATE:
 			f->R.rax = create((char *)f->R.rdi,f->R.rsi);
@@ -99,7 +101,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			close(f->R.rdi);
 			break;
 		default:
-			thread_exit();
+			exit(-1);
 	}
 }
 
@@ -128,6 +130,7 @@ void exit (int status)
 {
 	/* 실행중인 스레드 구조체를 가져옴 */
 	struct thread *curr = thread_current();
+	curr->exit_status = status;
 	/* 프로세스 종료 메시지 출력, 
 	출력 양식: “프로세스이름: exit(종료상태)” */
 	printf("%s: exit(%d)\n",curr->name,status);
@@ -256,4 +259,15 @@ void close (int fd)
 	/* 해당 파일 디스크립터에 해당하는 파일을 닫음 */
 	/* 파일 디스크립터 엔트리 초기화 */
 	process_close_file(fd);
+}
+
+int wait (tid_t tid){
+	/* process_wait() 사용 */
+	return process_wait(tid);
+} 
+
+tid_t fork (const char *name, struct intr_frame *if_){
+
+	/*자식 프로세스 생성 */
+	return process_fork(name, if_);
 }

@@ -1,2 +1,18 @@
 FAIL
-run: wait for child 1 of 10 returned 4 (expected 0): FAILED
+Kernel panic in run: PANIC at ../../lib/kernel/list.c:106 in list_prev(): assertion `is_interior (elem) || is_tail (elem)' failed.
+Call stack: 0x8004217ed6 0x800421828d 0x8004218c48 0x8004218ff7 0x800420a572 0x800421d3d4 0x800421d05f 0x800421cd96 0x40040a 0x40047e 0x4006ed 0x4002a6 0x400fa7 0x400ff0
+Translation of call stack:
+0x0000008004217ed6: debug_panic (lib/kernel/debug.c:32)
+0x000000800421828d: list_prev (lib/kernel/list.c:107)
+0x0000008004218c48: find_end_of_run (lib/kernel/list.c:348 (discriminator 1))
+0x0000008004218ff7: list_sort (lib/kernel/list.c:401)
+0x000000800420a572: lock_acquire (threads/synch.c:219)
+0x000000800421d3d4: write (userprog/syscall.c:222)
+0x000000800421d05f: syscall_handler (userprog/syscall.c:92)
+0x000000800421cd96: no_sti (userprog/syscall-entry.o:?)
+0x000000000040040a: (unknown)
+0x000000000040047e: (unknown)
+0x00000000004006ed: (unknown)
+0x00000000004002a6: (unknown)
+0x0000000000400fa7: (unknown)
+0x0000000000400ff0: (unknown)
