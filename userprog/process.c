@@ -18,6 +18,10 @@
 #include "threads/mmu.h"
 #include "threads/vaddr.h"
 #include "intrinsic.h"
+
+// Project 2 System Call
+#include "threads/synch.h"
+
 #ifdef VM
 #include "vm/vm.h"
 #endif
@@ -51,6 +55,7 @@ process_create_initd (const char *file_name) {
 	strlcpy (fn_copy, file_name, PGSIZE);
 
 	//내용 수정 
+	// Project2
 	/*3. Thread name parsing */
 	char *save_ptr;
 	char *temp = strtok_r(file_name," ",&save_ptr);
@@ -91,29 +96,35 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
  * pml4_for_each. This is only for the project 2. */
 static bool
 duplicate_pte (uint64_t *pte, void *va, void *aux) {
-	struct thread *current = thread_current ();
 	struct thread *parent = (struct thread *) aux;
+	struct thread *current = thread_current ();
 	void *parent_page;
 	void *newpage;
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kern_pte(pte)) return false;
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	newpage = palloc_get_page(PAL_USER);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memset(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		return false;
 	}
+
 	return true;
 }
 #endif
@@ -125,11 +136,14 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 static void
 __do_fork (void *aux) {
 	struct intr_frame if_;
+	/* Parent Process */
 	struct thread *parent = (struct thread *) aux;
+	/* Child Process */
 	struct thread *current = thread_current ();
 	/* TODO: somehow pass the parent_if. (i.e. process_fork()'s if_) */
 	struct intr_frame *parent_if;
 	bool succ = true;
+	parent_if = &parent->parent->tf;
 
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
@@ -140,6 +154,7 @@ __do_fork (void *aux) {
 		goto error;
 
 	process_activate (current);
+
 #ifdef VM
 	supplemental_page_table_init (&current->spt);
 	if (!supplemental_page_table_copy (&current->spt, &parent->spt))
@@ -154,6 +169,16 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent.*/
+	
+	// Project2 
+	// Duplicate the file Descriptor.
+	int idx;
+	for (idx = 2; idx < parent->next_fd; idx++){
+		if (parent->fdt[idx]){
+			current->fdt[idx] = file_duplicate(parent->fdt[idx]);
+		}
+	}
+	current->next_fd = parent->next_fd;
 
 	process_init ();
 
@@ -166,7 +191,7 @@ error:
 
 // 내용 수정
 /* Switch the current execution context to the f_name.
- * Returns -1 on fail. */
+ * Returns -1 on fail. = start_process*/ 
 int
 process_exec (void *f_name) {
 	char *file_name = f_name;
@@ -196,6 +221,11 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	// Project2 System Call
+	// Process Set
+	/* 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
+	// sema_up(thread_current()->parent);
+
 	/*2. Push User Stack*/
 	argument_stack(argv , idx , &_if.rsp);
 	_if.R.rsi = (uint64_t )_if.rsp + 8;
@@ -204,15 +234,20 @@ process_exec (void *f_name) {
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
 
-	if (!success)
+	// Project2 System Call
+	/* 메모리 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패 */
+	if (!success){
+		thread_exit();
 		return -1;
+	}
+	/* 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
 
 	/* hex dump check */
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
-
 	/* Start switched process. */
 	do_iret (&_if);
 	NOT_REACHED ();
+
 }
 
 
@@ -226,14 +261,31 @@ process_exec (void *f_name) {
  * This function will be implemented in problem 2-2.  For now, it
  * does nothing. */
 
-// 3. hex dump 출력을 위한 추가 (내용 수정)
 int
 process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	for(int i=0;i<100000000;i++);
-	return -1;
+
+	// Project2 System Call
+	// Set Process
+	/* 자식 프로세스의 프로세스 디스크립터 검색 */
+	struct thread *child = get_child_process(child_tid);
+
+	/* 자식 프로세스가 없는 경우 -1 리턴 */
+	if (child == NULL) return -1;
+
+	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
+	sema_down(&child->exit_sema);
+
+	/* 자식 프로세스 디스크립터 삭제 */
+	remove_child_process(&child);
+
+	/* 자식 프로세스의 exit status 리턴 */
+	return child->exit_status;
+	
+	// for(int i=0;i<100000000;i++);
+	// return -1;
 }
 
 /* Exit the process. This function is called by thread_exit (). */
@@ -361,7 +413,7 @@ static bool load_segment (struct file *file, off_t ofs, uint8_t *upage,
 		bool writable);
 
 // 내용 수정
-/* Push Argument Stack */
+/* Project2 Push Argument Stack */
 void argument_stack(char **parse ,int count , void **rsp){
 	// 1. Push Arguments
 	int temp=0;
@@ -558,14 +610,21 @@ int process_add_file (struct file *f)
 	/* 파일 객체를 파일 디스크립터 테이블에 추가
 	/* 파일 디스크립터의 최대값 1 증가 */
 	int fd = curr->next_fd;
+	/* fdt가 가득 찼다면 */
+	if (fd > MAX_FD) return -1;
 	curr->fdt[fd] = f;
 	curr->next_fd +=1;
 	/* 파일 디스크립터 리턴 */
 	return fd;
 }
 
+// 내용 수정
+// Project2 System Call
 struct file *process_get_file(int fd)
 {
+	/* 파일 디스크립터가 Max fd 보다 크거나 같고, 0 보다 작은 경우 NULL 리턴 */
+	if (fd < 0 || fd > MAX_FD)
+		return NULL;
 	/* 파일 디스크립터에 해당하는 파일 객체를 리턴 */
 	struct thread *curr = thread_current();
 	if (curr->fdt[fd]!=NULL){
@@ -575,15 +634,49 @@ struct file *process_get_file(int fd)
 	return NULL;
 }
 
+// 내용 수정
+// Project2 System Call
 void process_close_file(int fd)
 {
 	struct thread *curr = thread_current();
 	/* 파일 디스크립터에 해당하는 파일을 닫음 */
+
 	file_close(curr->fdt[fd]);
 	/* 파일 디스크립터 테이블 해당 엔트리 초기화 */
 	curr->fdt[fd] = 0;
 	
 }
+
+// 내용 수정
+// Project2 System Call
+/* child process start*/
+struct thread *get_child_process (int child_tid)
+{
+	struct thread *current_thread = thread_current(); // 현재 실행 중인 스레드
+	struct list_elem *e;
+
+	/* 자식 리스트에 접근하여 프로세스 디스크립터 검색 */
+	for (e = list_begin(&current_thread->child_list); e != list_end(&current_thread->child_list); e = list_next(e)){
+		struct thread *child = list_entry(e, struct thread, child_elem);
+		if (child->tid == child_tid) return child;
+ 	}
+
+	/* 리스트에 존재하지 않으면 NULL 리턴 */
+	return NULL;
+}
+
+// 내용 수정
+// Project2 System Call
+/* 부모 프로세스의 자식 리스트에서 프로세스 디스크립터 제거 */ 
+void remove_child_process(struct thread *child)
+{
+	/* 자식 리스트에서 제거*/
+	list_remove(&child->child_elem);
+	/* 프로세스 디스크립터 메모리 해제 */
+	free(child);
+}
+
+
 
 #ifndef VM
 /* Codes of this block will be ONLY USED DURING project 2.

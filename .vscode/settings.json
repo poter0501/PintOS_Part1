@@ -19,6 +19,12 @@
         "limits": "c",
         "sstream": "c",
         "streambuf": "c",
-        "string_view": "c"
+        "string_view": "c",
+        "atomic": "c",
+        "memory_resource": "c",
+        "mmu.h": "c",
+        "pte.h": "c",
+        "process.h": "c",
+        "stdint.h": "c"
     }
 }

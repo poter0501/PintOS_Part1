@@ -52,12 +52,12 @@ syscall_handler (struct intr_frame *f UNUSED) {
 
 	/* 유저 스택에 저장되어 있는 시스템 콜 넘버를 이용해 시스템 콜
 	핸들러 구현 */
-	uint64_t scall = f->R.rax;
+	uint64_t scall = f->R.rax; /* 시스템 콜 번호*/
 
 	/* 스택 포인터가 유저 영역인지 확인 */
 	/* 저장된 인자 값이 포인터일 경우 유저 영역의 주소인지 확인 */
 	check_address(f->rsp);
-
+// %rdi, %rsi, %rdx, %r10, %r8, %r9
 	switch(scall){
 		case SYS_HALT:
 			halt();
@@ -66,10 +66,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			exit(f->R.rdi);
 			break;             
 		case SYS_FORK:
+			f->R.rax = fork((const char *)f->R.rdi, f);
 			break;
 		case SYS_EXEC:
+			f->R.rax = exec((const char *)f->R.rdi, f);
 			break;   
 		case SYS_WAIT:
+			f->R.rax = wait(f->R.rdi);
 			break; 
 		case SYS_CREATE:
 			f->R.rax = create((char *)f->R.rdi,f->R.rsi);
@@ -123,11 +126,15 @@ void halt (void)
 }
 
 // 내용 수정
-// Project2 Process Termination Message
+// Project4 Process Termination Message
 void exit (int status)
 {
 	/* 실행중인 스레드 구조체를 가져옴 */
 	struct thread *curr = thread_current();
+
+	/*Project2 Process Set*/
+	/* 프로세스 디스크립터에 exit status 저장 */
+	curr->exit_status = status;
 	/* 프로세스 종료 메시지 출력, 
 	출력 양식: “프로세스이름: exit(종료상태)” */
 	printf("%s: exit(%d)\n",curr->name,status);
@@ -161,7 +168,7 @@ bool remove(const char *file)
 // Project2 System Call
 int open(const char *file)
 {	
-	/* file 명이 NULL 인 경우 실행없이 종료 */
+	/* file명이 NULL 인 경우 실행없이 종료 */
 	if (file == NULL) exit(-1);
 	/* 파일을 open */
 	struct file *result = filesys_open(file);
@@ -177,8 +184,8 @@ int open(const char *file)
 // Project2 System Call
 int filesize (int fd)
 {	
-	struct file *f_obj = process_get_file(fd);
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
+	struct file *f_obj = process_get_file(fd);
 	/* 해당 파일의 크기를 리턴 */
 	if (f_obj!=NULL) return file_length(f_obj);
 	
@@ -186,6 +193,8 @@ int filesize (int fd)
 	else return -1;
 }
 
+// 내용 수정
+// Project2 System Call
 int read (int fd, void *buffer, unsigned size)
 {
 	struct thread *curr = thread_current();
@@ -210,6 +219,8 @@ int read (int fd, void *buffer, unsigned size)
 	}
 }
 
+// 내용 수정
+// Project2 System Call
 int write(int fd, void *buffer, unsigned size)
 {
 	struct thread *curr = thread_current();
@@ -234,6 +245,8 @@ int write(int fd, void *buffer, unsigned size)
 	}
 }
 
+// 내용 수정
+// Project2 System Call
 void seek (int fd, unsigned position)
 {
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
@@ -242,6 +255,8 @@ void seek (int fd, unsigned position)
 	file_seek(f_obj,position);
 }
 
+// 내용 수정
+// Project2 System Call
 unsigned tell (int fd)
 {
 	/* 파일 디스크립터를 이용하여 파일 객체 검색 */
@@ -251,9 +266,40 @@ unsigned tell (int fd)
 	else return -1;
 }
 
+// 내용 수정
+// Project2 System Call
 void close (int fd)
 {
 	/* 해당 파일 디스크립터에 해당하는 파일을 닫음 */
 	/* 파일 디스크립터 엔트리 초기화 */
 	process_close_file(fd);
+}
+
+// 내용 수정
+// Project2 System Call
+/* Process set */
+tid_t exec(const char *cmd_line, struct intr_frame *if_)
+{
+	/* 함수를 호출하여 자식 프로세스 생성 */
+	tid_t child_tid = fork (cmd_line, if_);
+	/* 생성된 자식 프로세스 검색 */
+	/* 자식 프로세스의 프로그램이 적재될 때까지 부모 프로세스 대기 */
+	int result = wait(child_tid);
+	/* 프로그램 적재 실패 시 -1 리턴 */
+	if (result == -1 ) return -1;
+	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴 */
+	else return child_tid;
+}
+
+int wait (tid_t tid){
+
+	/* process_wait() 사용 */
+	return process_wait(tid);
+} 
+
+
+tid_t fork (const char *name, struct intr_frame *if_){
+
+	/*자식 프로세스 생성 */
+	return process_fork(name, if_);
 }

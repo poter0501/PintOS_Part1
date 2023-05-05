@@ -140,12 +140,12 @@ thread_init (void) {
 
 	/* Init the globla thread context */
 	lock_init (&tid_lock);
+
 	// 내용 추가
 	// Project1-1
 	list_init (&ready_list);
 	// Project1-2
 	list_init (&waiting_list);
-	
 	list_init (&destruction_req);
 
 	/* Set up a thread structure for the running thread. */
@@ -246,7 +246,23 @@ thread_create (const char *name, int priority,
 	/* fd 값 초기화(0,1은 표준 입력,출력) */
 	t->next_fd = 2;
 	/* File Descriptor 테이블에 메모리 할당 */
-	t->fdt = calloc (64, sizeof (struct file*));
+	t->fdt = calloc (128, sizeof (struct file*));
+
+	// Project2 System Call
+	/* child process start*/
+	/* 부모 프로세스 저장 */
+	t->parent = thread_current();
+	/* 프로세스가 종료되지 않음 */
+	t->exit_status = 0;
+
+
+	/* 자식 리스트에 추가 */
+	list_push_back(&thread_current()->child_list,&t->elem);
+
+	/* 프로그램이 로드되지 않음 */
+	// t->process_mem = -1;
+	/* load 세마포어 0으로 초기화 */
+	// sema_init (&t->load_sema, 0);
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -254,8 +270,6 @@ thread_create (const char *name, int priority,
 	// 내용 추가
 	// Project1-2
 	preempt_priority();
-
-
 
 	return tid;
 }
@@ -332,6 +346,10 @@ void
 thread_exit (void) {
 	ASSERT (!intr_context ());
 
+	// Project2 System Call
+	// Set Process 
+	sema_up(&thread_current()	->exit_sema);
+
 #ifdef USERPROG
 	process_exit ();
 #endif
@@ -339,6 +357,7 @@ thread_exit (void) {
 	/* Just set our status to dying and schedule another process.
 	   We will be destroyed during the call to schedule_tail(). */
 	intr_disable ();
+
 	do_schedule (THREAD_DYING);
 	NOT_REACHED ();
 }
@@ -529,15 +548,23 @@ init_thread (struct thread *t, const char *name, int priority) {
 	t->tf.rsp = (uint64_t) t + PGSIZE - sizeof (void *);
 	t->priority = priority;
 	t->magic = THREAD_MAGIC;
+
 	// 수정
 	// Project1
 	list_init(&t->donations);
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
+
+	/* exit 세마포어 0으로 초기화 */
+	sema_init (&t->exit_sema, 0);
+
+	/*child list 초기화*/
+	list_init(&t->child_list);
+
 	// 수정
 	// Project2 System Call 
-	/* 자식 리스트 초기화 */
-	list
+	/* Process set 자식 리스트 초기화 */
+	// list_init(&t->child_list);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should
@@ -662,7 +689,9 @@ do_schedule(int status) {
 	while (!list_empty (&destruction_req)) {
 		struct thread *victim =
 			list_entry (list_pop_front (&destruction_req), struct thread, elem);
-		palloc_free_page(victim);
+
+		// Project2 System Call
+		// palloc_free_page(victim); /* 프로세스 디스크립터 삭제 */
 	}
 	thread_current ()->status = status;
 	schedule ();

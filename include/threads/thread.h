@@ -101,33 +101,38 @@ struct thread {
 	/* Shared between thread.c and synch.c. */
 	struct list_elem elem;              /* List element. */
 	
+	// 내용 수정
+	// Project2 System Call
+	/* Set file descriptor table */
+	struct file **fdt;   
+	/* Next available fd */
+	int next_fd;
+
+	// 내용 수정
+	// Project2 System Call
+	// Set process
+	/* 부모 프로세스의 디스크립터 */
+	struct thread *parent;
+	/* 자식 리스트 element */
+	struct list_elem child_elem;
+	/* 자식 리스트 */
+	struct list child_list;
+	/* exit 호출 시 종료 status */
+	int exit_status;
+	/* exit 세마포어 */
+	struct semaphore *exit_sema; 
+
+	/* 프로세스가 종료 유무 확인 */
+	// int exit_check;
+	/* 프로세스의 프로그램 메모리 적재 유무 */
+	// int wait_;
+	// /* load 세마포어 */
+	// struct semaphore *load_sema;
 
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
-
-	// 내용 수정
-	// Project2 System Call
-	/* Set file descriptor*/
-	struct file **fdt;
-	/* Next available fd */
-	int next_fd;
-
-	/* 부모 프로세스의 디스크립터 */
-	struct thread *parent;
-	/* 자식 리스트 element */
-	struct list_elem child_list_elem;
-	/* 자식 리스트 */
-	struct list child_list;
-	/* 프로세스의 프로그램 메모리 적재 유무 */
-
-	/* 프로세스가 종료 유무 확인 */
-	/* exit 세마포어 */
-	/* load 세마포어 */
-	/* exit 호출 시 종료 status */
-	int f_exit 
-
 	
 #endif
 #ifdef VM
