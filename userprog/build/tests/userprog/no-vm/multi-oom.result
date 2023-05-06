@@ -1,6 +1,6 @@
 FAIL
 Kernel panic in run: PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
-Call stack: 0x8004217ed6 0x800421cc42 0x8004208feb 0x8004209409 0x8004218688 0x800420bfb0 0x800421fa36 0x800421ef6e 0x800421f03e 0x800421d9b4 0x800421d26f 0x800421cfbd 0x800421cd96 0x40011c 0x4003a7 0x40044b 0x400fb0
+Call stack: 0x8004217ed6 0x800421cc42 0x8004208feb 0x8004209409 0x8004218688 0x800420bfb0 0x800421fa83 0x800421efbb 0x800421f08b 0x800421da01 0x800421d269 0x800421cfb7 0x800421cd96 0x40011c 0x4003a7 0x40044b 0x400fb0
 Translation of call stack:
 0x0000008004217ed6: debug_panic (lib/kernel/debug.c:32)
 0x000000800421cc42: kill (userprog/exception.c:103)
@@ -8,12 +8,12 @@ Translation of call stack:
 0x0000008004209409: intr_entry (threads/intr-stubs.o:?)
 0x0000008004218688: list_push_front (lib/kernel/list.c:197)
 0x000000800420bfb0: free (threads/malloc.c:222)
-0x000000800421fa36: inode_read_at (filesys/inode.c:225)
-0x000000800421ef6e: lookup (filesys/directory.c:88 (discriminator 1))
-0x000000800421f03e: dir_lookup (filesys/directory.c:112)
-0x000000800421d9b4: filesys_open (filesys/filesys.c:87)
-0x000000800421d26f: open (userprog/syscall.c:170)
-0x000000800421cfbd: syscall_handler (userprog/syscall.c:83)
+0x000000800421fa83: inode_read_at (filesys/inode.c:225)
+0x000000800421efbb: lookup (filesys/directory.c:88 (discriminator 1))
+0x000000800421f08b: dir_lookup (filesys/directory.c:112)
+0x000000800421da01: filesys_open (filesys/filesys.c:87)
+0x000000800421d269: open (userprog/syscall.c:170)
+0x000000800421cfb7: syscall_handler (userprog/syscall.c:83)
 0x000000800421cd96: no_sti (userprog/syscall-entry.o:?)
 0x000000000040011c: (unknown)
 0x00000000004003a7: (unknown)

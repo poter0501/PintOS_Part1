@@ -261,6 +261,9 @@ void close (int fd)
 	process_close_file(fd);
 }
 
+// 내용 수정
+// Project2 System Call
+/* Process set */
 int wait (tid_t tid){
 	/* process_wait() 사용 */
 	return process_wait(tid);
@@ -270,4 +273,17 @@ tid_t fork (const char *name, struct intr_frame *if_){
 
 	/*자식 프로세스 생성 */
 	return process_fork(name, if_);
+}
+
+tid_t exec(const char *cmd_line, struct intr_frame *if_)
+{
+	/* 함수를 호출하여 자식 프로세스 생성 */
+	tid_t child_tid = fork (cmd_line, if_);
+	/* 생성된 자식 프로세스 검색 */
+	/* 자식 프로세스의 프로그램이 적재될 때까지 부모 프로세스 대기 */
+	int result = wait(child_tid);
+	/* 프로그램 적재 실패 시 -1 리턴 */
+	if (result == -1 ) return -1;
+	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴 */
+	else return child_tid;
 }

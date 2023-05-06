@@ -26,6 +26,9 @@ int write(int fd, void *buffer, unsigned size);
 void seek (int fd, unsigned position);
 unsigned tell (int fd);
 void close (int fd);
+int wait (tid_t tid);
+tid_t fork (const char *name, struct intr_frame *if_);
+tid_t exec(const char *cmd_line, struct intr_frame *if_);
 
 
 // 수정

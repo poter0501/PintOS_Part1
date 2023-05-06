@@ -4,7 +4,7 @@ Kernel command line: -q -f put multi-oom run multi-oom
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  157,081,600 loops/s.
+Calibrating timer...  105,062,400 loops/s.
 hd0:0: detected 313 sector (156 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 107 sector (53 kB) disk, model "QEMU HARDDISK", serial "QM00003"
@@ -22,14 +22,14 @@ r11 0000000000000216 r12 000000800421ce6d r13 0000000000000000 r14 0000000000000
 r15 0000000000000000 rflags 00000206
 es: 001b ds: 001b cs: 0008 ss: 0010
 Kernel PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
-Call stack: 0x8004217ed6 0x800421cc42 0x8004208feb 0x8004209409 0x8004218688 0x800420bfb0 0x800421fa36 0x800421ef6e 0x800421f03e 0x800421d9b4 0x800421d26f 0x800421cfbd 0x800421cd96 0x40011c 0x4003a7 0x40044b 0x400fb0.
+Call stack: 0x8004217ed6 0x800421cc42 0x8004208feb 0x8004209409 0x8004218688 0x800420bfb0 0x800421fa83 0x800421efbb 0x800421f08b 0x800421da01 0x800421d269 0x800421cfb7 0x800421cd96 0x40011c 0x4003a7 0x40044b 0x400fb0.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.
-Timer: 74 ticks
-Thread: 30 idle ticks, 33 kernel ticks, 11 user ticks
+Timer: 83 ticks
+Thread: 30 idle ticks, 44 kernel ticks, 9 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 212 reads, 242 writes
 hd1:0: 107 reads, 0 writes
-Console: 1766 characters output
+Console: 1765 characters output
 Key
