@@ -4,7 +4,7 @@ Kernel command line: -q -f put multi-oom run multi-oom
 Pintos booting with: 
 	base_mem: 0x0 ~ 0x9fc00 (Usable: 639 kB)
 	ext_mem: 0x100000 ~ 0x13e0000 (Usable: 19,328 kB)
-Calibrating timer...  105,062,400 loops/s.
+Calibrating timer...  52,736,000 loops/s.
 hd0:0: detected 313 sector (156 kB) disk, model "QEMU HARDDISK", serial "QM00001"
 hd0:1: detected 20,160 sector (9 MB) disk, model "QEMU HARDDISK", serial "QM00002"
 hd1:0: detected 107 sector (53 kB) disk, model "QEMU HARDDISK", serial "QM00003"
@@ -13,23 +13,23 @@ Boot complete.
 Putting 'multi-oom' into the file system...
 Executing 'multi-oom':
 (multi-oom) begin
-Interrupt 0x0d (#GP General Protection Exception) at rip=800421848a
+Interrupt 0x0d (#GP General Protection Exception) at rip=8004218498
  cr2=0000000000000000 error=               0
 rax cccccccccccccccc rbx 0000000000000000 rcx 0000000000000200 rdx 000000800423b618
-rsp 000000800423fd20 rbp 000000800423fd30 rsi 000000800423b618 rdi 000000800423b618
-rip 000000800421848a r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
-r11 0000000000000216 r12 000000800421ce6d r13 0000000000000000 r14 0000000000000000
+rsp 0000008004248d20 rbp 0000008004248d30 rsi 000000800423b618 rdi 000000800423b618
+rip 0000008004218498 r8 0000000000000000  r9 0000000000000000 r10 0000000000000000
+r11 0000000000000216 r12 000000800421ce6b r13 0000000000000000 r14 0000000000000000
 r15 0000000000000000 rflags 00000206
 es: 001b ds: 001b cs: 0008 ss: 0010
 Kernel PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
-Call stack: 0x8004217ed6 0x800421cc42 0x8004208feb 0x8004209409 0x8004218688 0x800420bfb0 0x800421fa83 0x800421efbb 0x800421f08b 0x800421da01 0x800421d269 0x800421cfb7 0x800421cd96 0x40011c 0x4003a7 0x40044b 0x400fb0.
+Call stack: 0x8004217ee4 0x800421cc40 0x8004208ff9 0x8004209417 0x8004218696 0x800420bfbe 0x800421fabd 0x800421eff5 0x800421f0c5 0x800421da3b 0x800421d297 0x800421cfe6 0x800421cd94 0x40011c 0x4003a7 0x40044b 0x400fb0.
 The `backtrace' program can make call stacks useful.
 Read "Backtraces" in the "Debugging Tools" chapter
 of the Pintos documentation for more information.
-Timer: 83 ticks
-Thread: 30 idle ticks, 44 kernel ticks, 9 user ticks
+Timer: 75 ticks
+Thread: 30 idle ticks, 38 kernel ticks, 7 user ticks
 hd0:0: 0 reads, 0 writes
 hd0:1: 212 reads, 242 writes
 hd1:0: 107 reads, 0 writes
-Console: 1765 characters output
+Console: 1764 characters output
 Key

@@ -1,16 +1,16 @@
 FAIL
-Kernel panic in run: PANIC at ../../lib/kernel/list.c:158 in list_insert(): assertion `is_interior (before) || is_tail (before)' failed.
-Call stack: 0x8004217ed6 0x800421841f 0x80042186c7 0x800420a035 0x800421b680 0x800421d541 0x800421cf10 0x800421cd96 0x4006a9 0x4002a6 0x400fa7 0x400ff0
+Kernel panic in run: PANIC at ../../userprog/exception.c:97 in kill(): Kernel bug - unexpected interrupt in kernel
+Call stack: 0x8004217ee4 0x800421cc40 0x8004208ff9 0x8004209417 0x800421baf2 0x800421d543 0x800421cf65 0x800421cd94 0x4007b9 0x4002be 0x400fa7 0x400ff0
 Translation of call stack:
-0x0000008004217ed6: debug_panic (lib/kernel/debug.c:32)
-0x000000800421841f: list_insert (lib/kernel/list.c:159)
-0x00000080042186c7: list_push_back (lib/kernel/list.c:204)
-0x000000800420a035: sema_down (threads/synch.c:71)
-0x000000800421b680: process_fork (userprog/process.c:90)
-0x000000800421d541: fork (userprog/syscall.c:276)
-0x000000800421cf10: syscall_handler (userprog/syscall.c:69)
-0x000000800421cd96: no_sti (userprog/syscall-entry.o:?)
-0x00000000004006a9: (unknown)
-0x00000000004002a6: (unknown)
+0x0000008004217ee4: debug_panic (lib/kernel/debug.c:32)
+0x000000800421cc40: kill (userprog/exception.c:103)
+0x0000008004208ff9: intr_handler (threads/interrupt.c:352)
+0x0000008004209417: intr_entry (threads/intr-stubs.o:?)
+0x000000800421baf2: process_wait (userprog/process.c:269)
+0x000000800421d543: wait (userprog/syscall.c:274)
+0x000000800421cf65: syscall_handler (userprog/syscall.c:76)
+0x000000800421cd94: no_sti (userprog/syscall-entry.o:?)
+0x00000000004007b9: (unknown)
+0x00000000004002be: (unknown)
 0x0000000000400fa7: (unknown)
 0x0000000000400ff0: (unknown)

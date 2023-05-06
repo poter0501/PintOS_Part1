@@ -219,6 +219,12 @@ process_exec (void *f_name) {
 
 	/* And then load the binary */
 	success = load (file_name, &_if);
+	
+	// lock 반환
+	// thread_current()->mem_load = success;
+
+	if (!success)
+		return -1;
 
 	/*2. Push User Stack*/
 	argument_stack(argv , idx , &_if.rsp);
@@ -226,10 +232,10 @@ process_exec (void *f_name) {
 	_if.R.rdi = idx;
 
 	/* If load failed, quit. */
-	palloc_free_page (file_name);
-
-	if (!success)
-		return -1;
+	/* Start switched process. */
+    // if (is_kernel_vaddr(file_name))
+	
+	// palloc_free_page (file_name);
 
 	/* hex dump check */
 	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
@@ -453,6 +459,7 @@ load (const char *file_name, struct intr_frame *if_) {
 	t->pml4 = pml4_create ();
 	if (t->pml4 == NULL)
 		goto done;
+
 	process_activate (thread_current ());
 
 	/* Open executable file. */

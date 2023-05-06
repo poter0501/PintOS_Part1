@@ -7,6 +7,7 @@
 #include "userprog/gdt.h"
 #include "threads/flags.h"
 #include "intrinsic.h"
+#include "threads/palloc.h"
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -69,6 +70,7 @@ syscall_handler (struct intr_frame *f UNUSED) {
 			f->R.rax = fork((const char *)f->R.rdi, f);
 			break;
 		case SYS_EXEC:
+			f->R.rax = exec((const char *)f->R.rdi,f);
 			break;   
 		case SYS_WAIT:
 			f->R.rax = wait(f->R.rdi);
@@ -134,8 +136,10 @@ void exit (int status)
 	/* 프로세스 종료 메시지 출력, 
 	출력 양식: “프로세스이름: exit(종료상태)” */
 	printf("%s: exit(%d)\n",curr->name,status);
+	
 	/* 스레드 종료 */
 	thread_exit ();
+	
 }
 
 // 내용 수정
@@ -277,13 +281,21 @@ tid_t fork (const char *name, struct intr_frame *if_){
 
 tid_t exec(const char *cmd_line, struct intr_frame *if_)
 {
+
+	/* file_name 복사 */
+	char * new_file_name = palloc_get_page(PAL_USER);
+	// if (new_file_name==NULL) exit(-1);
+	strlcpy(new_file_name,cmd_line,PGSIZE);
+
 	/* 함수를 호출하여 자식 프로세스 생성 */
-	tid_t child_tid = fork (cmd_line, if_);
-	/* 생성된 자식 프로세스 검색 */
-	/* 자식 프로세스의 프로그램이 적재될 때까지 부모 프로세스 대기 */
-	int result = wait(child_tid);
-	/* 프로그램 적재 실패 시 -1 리턴 */
-	if (result == -1 ) return -1;
-	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴 */
-	else return child_tid;
+	process_exec(new_file_name);
+	// /* 생성된 자식 프로세스 검색 */
+	// struct thread *child = get_child_process(tid);
+	// /* 자식 프로세스의 프로그램이 적재될 때까지 대기 */
+	// // sema_down(&child->load_sema);
+	// /* 프로그램 적재 실패 시 -1 리턴 */
+	// if (tid == -1) return -1;
+	// /* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴 */
+	// else return tid;
+	
 }

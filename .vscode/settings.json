@@ -20,6 +20,8 @@
         "sstream": "c",
         "streambuf": "c",
         "string_view": "c",
-        "thread.h": "c"
+        "thread.h": "c",
+        "loader.h": "c",
+        "palloc.h": "c"
     }
 }

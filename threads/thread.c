@@ -554,6 +554,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	/* child list 초기화 */
 	list_init(&t->child_list);
 
+	/* 메모리 적재 유무 확인 */
+	t->mem_load = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

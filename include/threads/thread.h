@@ -118,6 +118,7 @@ struct thread {
 	/* 자식 리스트 */
 	struct list child_list;
 	/* 프로세스의 프로그램 메모리 적재 유무 */
+	int mem_load;
 
 	/* 프로세스가 종료 유무 확인 */
 	/* exit 세마포어 */
