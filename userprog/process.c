@@ -272,12 +272,15 @@ process_wait (tid_t child_tid UNUSED) {
 	if (child == NULL) return -1;
 
 	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
-	sema_down(&child->exit_sema);
+	sema_down(&child->wait_sema);
 
 	/* 자식 프로세스 디스크립터 삭제 */
 	//remove_child_process(&child);
 	list_remove(&child->child_elem);
 
+	/* 자식 프로세스를 기다리는 것을 부모 프로세스가 진행하는데  */
+	sema_up(&child->free_sema);
+	
 	/* 자식 프로세스의 exit status 리턴 */
 	return child->exit_status;
 	
@@ -295,10 +298,12 @@ process_exit (void) {
 	
 	// 내용 수정
 	// Project2 System Call
+	/* Destroy the current process's page directory and switch backto the kernel-only page directory. */
+	/* 실행 중인 파일 close */
 	/* 프로세스에 열린 모든 파일을 닫음 */
 	/* 파일 디스크립터 테이블의 최대값을 이용해 파일 디스크립터
 	의 최소값인 2가 될 때까지 파일을 닫음 */
-	while (curr->next_fd > 2){
+	while (curr->next_fd >= 2){
 		file_close(curr->fdt[curr->next_fd]);
 		curr->next_fd -= 1;
 	}
@@ -306,6 +311,12 @@ process_exit (void) {
 	/* 파일 디스크립터 테이블 메모리 해제 */
 	free(curr->fdt);
 	curr->fdt = NULL;
+
+	// Project2 System Call
+	// Set Process 
+	sema_up(&curr->wait_sema);
+	file_close(curr->running_file);
+	sema_down(&curr->free_sema);
 
 	process_cleanup ();
 }
@@ -462,12 +473,15 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	process_activate (thread_current ());
 
+
+
 	/* Open executable file. */
 	file = filesys_open (file_name);
 	if (file == NULL) {
 		printf ("load: %s: open failed\n", file_name);
 		goto done;
 	}
+
 
 	/* Read and verify executable header. */
 	if (file_read (file, &ehdr, sizeof ehdr) != sizeof ehdr
@@ -480,6 +494,7 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: error loading executable\n", file_name);
 		goto done;
 	}
+
 
 	/* Read program headers. */
 	file_ofs = ehdr.e_phoff;
@@ -547,9 +562,13 @@ load (const char *file_name, struct intr_frame *if_) {
 
 	success = true;
 
+	t->running_file = file;
+	file_deny_write(t->running_file);
+
+
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// file_close (file);
 	return success;
 }
 
@@ -605,6 +624,9 @@ int process_add_file (struct file *f)
 	struct thread *curr = thread_current();
 	/* 파일 객체를 파일 디스크립터 테이블에 추가
 	/* 파일 디스크립터의 최대값 1 증가 */
+
+	// Find open spot from the front
+    //  fd 위치가 제한 범위 넘지않고, fd table의 인덱스 위치와 일치한다면
 	int fd = curr->next_fd;
 	curr->fdt[fd] = f;
 	curr->next_fd +=1;

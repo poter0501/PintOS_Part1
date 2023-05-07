@@ -246,7 +246,7 @@ thread_create (const char *name, int priority,
 	/* fd 값 초기화(0,1은 표준 입력,출력) */
 	t->next_fd = 2;
 	/* File Descriptor 테이블에 메모리 할당 */
-	t->fdt = calloc (64, sizeof (struct file*));
+	t->fdt = calloc (FDCOUNT_LIMIT, sizeof (struct file*));
 
 	// Project2 System Call
 	/* child process start*/
@@ -254,6 +254,9 @@ thread_create (const char *name, int priority,
 	// t->parent_if = thread_current();
 	/* 자식 리스트에 추가 */
 	list_push_back(&thread_current()->child_list,&t->child_elem);
+
+	/* running_file 초기화 */
+	t->running_file = NULL;
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -337,10 +340,6 @@ void
 thread_exit (void) {
 	ASSERT (!intr_context ());
 
-	// Project2 System Call
-	// Set Process 
-	sema_up(&thread_current()->exit_sema);
-	
 #ifdef USERPROG
 	process_exit ();
 #endif
@@ -548,9 +547,11 @@ init_thread (struct thread *t, const char *name, int priority) {
 	// Project2 System Call 
 	/* 프로세스가 종료되지 않음 */
 	t->exit_status = 0;
-	/* load 세마포어 0으로 초기화 */
-	sema_init (&t->exit_sema, 0);
+	/* 세마포어 0으로 초기화 */
+	sema_init (&t->wait_sema, 0);
 	sema_init (&t->fork_sema, 0);
+	sema_init (&t->free_sema, 0);
+
 	/* child list 초기화 */
 	list_init(&t->child_list);
 

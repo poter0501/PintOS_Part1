@@ -1,5 +1,6 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
+#define FDCOUNT_LIMIT 128
 
 #include <debug.h>
 #include <list.h>
@@ -122,12 +123,15 @@ struct thread {
 
 	/* 프로세스가 종료 유무 확인 */
 	/* exit 세마포어 */
-	struct semaphore exit_sema;
+	struct semaphore wait_sema;
 	struct semaphore fork_sema;
-	
-	/* load 세마포어 */
+	struct semaphore free_sema;
+	/* 현재 실행중인 파일 */
+	struct file *running_file;
 	/* exit 호출 시 종료 status */
 	int exit_status;
+
+
 
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
