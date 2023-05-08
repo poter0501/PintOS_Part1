@@ -182,19 +182,15 @@ __do_fork (void *aux) {
 
 	// Project2 
 	// Duplicate the file Descriptor.
-	for(int i = 0; i<FDCOUNT_LIMIT; i++){
-        struct file *file = parent->fdt[i];
-        if(file == NULL)
-            continue;
-        if(true){
-            struct file *newfile;
-            if(file>2)
-                newfile = file_duplicate(file); //file_duplicate 함수를 사용하여 부모 스레드의 파일 객체를 복제하여 자식 스레드에게 전달
-            else
-                newfile = file; //0, 1, 2는 표준 입력, 표준 출력, 표준 오류로 사용되는 파일 디스크립터이므로, 이들은 복제하지 않고 그대로 사용
-            current->fdt[i] = newfile;
-        }
-    }
+	for (int idx = 0; idx < FDCOUNT_LIMIT; idx++){
+		if (idx<3){
+			current->fdt[idx] = parent->fdt[idx];
+		}
+		if (parent->fdt[idx]!=NULL){
+			current->fdt[idx] = file_duplicate(parent->fdt[idx]);
+		}
+
+	}
 	current->next_fd = parent->next_fd;
 
 	// 다 만들어졌으니 sema up
