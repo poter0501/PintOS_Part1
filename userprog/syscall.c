@@ -11,6 +11,8 @@
 #include <string.h>
 #include "threads/synch.h"
 #include "filesys/filesys.h"
+#include "threads/palloc.h"
+#include <string.h>
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -18,7 +20,9 @@ void syscall_handler (struct intr_frame *);
 void check_address(void *addr);
 void halt (void);
 void exit (int status);
-int fork (const char *thread_name);
+int fork (const char *thread_name, struct intr_frame *f);
+int exec (const char *file);
+int wait (int pid);
 bool create (const char *file, unsigned initial_size);
 bool remove (const char *file);
 int open (const char *file);
@@ -84,13 +88,13 @@ syscall_handler (struct intr_frame *f UNUSED) {
 		exit((int)f->R.rdi);
 		break;
 	case SYS_FORK:
-		/* code */
+		f->R.rax = fork ((char*)f->R.rdi, f);
 		break;
 	case SYS_EXEC:
 		f->R.rax = exec((char*)f->R.rdi);
 		break;
 	case SYS_WAIT:
-		/* code */
+		f->R.rax = wait(f->R.rdi);
 		break;
 	case SYS_CREATE:
 		f->R.rax = create((char*)f->R.rdi, f->R.rsi);
@@ -141,24 +145,26 @@ void
 exit (int status) {
 	struct thread *curr = thread_current();
 	/* Save exit status at process descriptor -> ??*/
+	curr->exit_status = status;
 	printf("%s: exit(%d)\n", curr->name, status);
 	thread_exit();
 }
 int
 wait (int pid) {
 	
+	/* 자식 프로세스가 종료될 때 까지 대기하는 시스템 콜 */
+	int status = process_wait(pid);
+	return status;
 }
 int
 exec (const char *file) {
-	/* process_execute() 함수를 호출하여 자식 프로세스 생성 */ 
-	/* 생성된 자식 프로세스의 프로세스 디스크립터를 검색 */
-	/* 자식 프로세스의 프로그램이 적재될 때까지 대기 */
-	/* 프로그램 적재 실패 시 -1 리턴 */
-	/* 프로그램 적재 성공 시 자식 프로세스의 pid 리턴 */
+	char *temp = palloc_get_page(PAL_USER);
+	strlcpy(temp, file, strlen(file)+1);
+	return process_exec (temp);
 }
 int
-fork (const char *thread_name){
-	
+fork (const char *thread_name, struct intr_frame *if_){
+	return process_fork (thread_name, if_);
 }
 bool
 create (const char *file, unsigned initial_size) {
@@ -194,18 +200,26 @@ int
 read (int fd, void *buffer, unsigned size) {
 	struct file *file_curr = process_get_file(fd);
 	lock_acquire(&filesys_lock);
-	int bytes_written;
+	int bytes_read;
 	if (fd==0)
-		bytes_written = input_getc(buffer, size);
+		bytes_read = input_getc(buffer, size);
 	else
-		bytes_written = file_read (file_curr, buffer, size);
+	{
+		if(file_curr==NULL)
+		{
+			lock_release(&filesys_lock);
+			return -1;
+		}
+		bytes_read = file_read (file_curr, buffer, size);
+	}
 
 	lock_release(&filesys_lock);
-	return bytes_written;
+	return bytes_read;
 }
 int
 write (int fd, const void *buffer, unsigned size) {
 
+	struct thread *curr = thread_current();
 	struct file *file_curr = process_get_file(fd);
 	int bytes_written;
 	lock_acquire(&filesys_lock);
@@ -227,8 +241,7 @@ void
 seek (int fd, unsigned position) {
 
 	struct file *file_curr = process_get_file(fd);
-
-	return file_seek (file_curr, position);
+	file_seek (file_curr, position);
 }
 unsigned
 tell (int fd) {

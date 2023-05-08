@@ -32,7 +32,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#define MAX_FILE_DES_TBL_SIZE 64
+#define MAX_FILE_DES_TBL_SIZE 128
 
 /* A kernel thread or user process.
  *
@@ -115,10 +115,11 @@ struct thread {
 	int exit_status;
 	struct semaphore sema_exit;
 	struct semaphore sema_load;
+	struct semaphore sema_free;
 	/* Project2 syscall - file */
 	struct file **fdt; /* File descriptor table */
 	int next_fd;
-
+	struct file *loaded_file;
 #ifdef USERPROG
 	/* Owned by userprog/process.c. */
 	uint64_t *pml4;                     /* Page map level 4 */
@@ -130,6 +131,7 @@ struct thread {
 
 	/* Owned by thread.c. */
 	struct intr_frame tf;               /* Information for switching */
+	struct intr_frame tf_fork;               /* Information for switching */
 	unsigned magic;                     /* Detects stack overflow. */
 };
 

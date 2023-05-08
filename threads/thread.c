@@ -249,10 +249,11 @@ thread_create (const char *name, int priority,
 	t->exit_status = 0;
 	sema_init(&t->sema_exit, 0);
 	sema_init(&t->sema_load, 0);
-	list_push_back (&t->child, &t->child_elem);
+	sema_init(&t->sema_free, 0);
+	list_push_back (&parent->child, &t->child_elem);
 
 	/* Project2 syscall - file */
-	t->fdt = calloc(64, sizeof(struct file*));
+	t->fdt = calloc(MAX_FILE_DES_TBL_SIZE, sizeof(struct file*));
 	t->next_fd=2;
 
 	/* Add to run queue. */
@@ -336,7 +337,7 @@ thread_tid (void) {
 void
 thread_exit (void) {
 	ASSERT (!intr_context ());
-
+	struct thread *curr = thread_current();
 #ifdef USERPROG
 	process_exit ();
 #endif
