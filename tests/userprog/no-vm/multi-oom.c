@@ -135,8 +135,11 @@ make_children (void) {
 
   if (i == 0)
 	  return depth;
-  else
+  else{
 	  exit (depth);
+
+  }
+
 }
 
 int

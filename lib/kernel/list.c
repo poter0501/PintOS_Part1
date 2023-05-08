@@ -487,3 +487,13 @@ list_min (struct list *list, list_less_func *less, void *aux) {
 	}
 	return min;
 }
+
+
+void list_free(struct list *list){
+	while (!list_empty (list)){
+		struct list_elem *e = list_pop_front (list);
+		free(e);
+	}
+	free(list);
+}
+

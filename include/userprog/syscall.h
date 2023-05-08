@@ -10,6 +10,7 @@
 #include "devices/input.h"
 #include "kernel/stdio.h"
 
+
 void syscall_init (void);
 
 // 내용 수정

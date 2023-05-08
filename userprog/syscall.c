@@ -8,6 +8,7 @@
 #include "threads/flags.h"
 #include "intrinsic.h"
 #include "threads/palloc.h"
+#include <string.h>
 
 void syscall_entry (void);
 void syscall_handler (struct intr_frame *);
@@ -115,7 +116,7 @@ void check_address(void *addr)
 	/*1. 유저영역의 주소보다 큰 경우*/
 	/*2. 페이지 할당이 안된 경우*/
 	/*3. addr 가 NULL인 경우*/
-	if (!is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4,addr) || !addr) exit(-1);
+	if (!is_user_vaddr(addr) || !pml4_get_page(thread_current()->pml4,addr) || addr == NULL) exit(-1);
 }
 
 // 내용 수정
@@ -135,8 +136,7 @@ void exit (int status)
 	curr->exit_status = status;
 	/* 프로세스 종료 메시지 출력, 
 	출력 양식: “프로세스이름: exit(종료상태)” */
-	printf("%s: exit(%d)\n",curr->name,status);
-	
+	printf("%s: exit(%d)\n",curr->name,curr->exit_status);
 	/* 스레드 종료 */
 	thread_exit ();
 	
@@ -146,6 +146,7 @@ void exit (int status)
 // Project2 System Call
 bool create(const char *file , unsigned initial_size)
 {
+
 	/* file 명이 NULL 인 경우 실행없이 종료 */
 	if (file == NULL) exit(-1);
 	/* 파일 이름과 크기에 해당하는 파일 생성 */
@@ -157,6 +158,7 @@ bool create(const char *file , unsigned initial_size)
 // Project2 System Call
 bool remove(const char *file)
 {	
+
 	/* file 명이 NULL 인 경우 실행없이 종료 */
 	if (file == NULL) exit(-1);
 	/* 파일 이름에 해당하는 파일을 제거 */
@@ -168,15 +170,18 @@ bool remove(const char *file)
 // Project2 System Call
 int open(const char *file)
 {	
+	// check_address(file);
 	/* file 명이 NULL 인 경우 실행없이 종료 */
 	if (file == NULL) exit(-1);
 	/* 파일을 open */
 	struct file *result = filesys_open(file);
+	if (result==NULL) return -1;
 	/* 해당 파일 객체에 파일 디스크립터 부여 */
 	int curr_fd = process_add_file(result);
+	// printf("fd :%d\n",curr_fd);
 	/* 해당 파일이 존재하면 파일 디스크립터 리턴 */
-	if (result!=NULL) return curr_fd;
-	/* 해당 파일이 존재하지 않으면 -1 리턴 */
+	if (curr_fd!=-1) return curr_fd;
+	// /* 해당 파일이 존재하지 않으면 -1 리턴 */
 	else return -1;
 }
 
@@ -195,6 +200,7 @@ int filesize (int fd)
 
 int read (int fd, void *buffer, unsigned size)
 {
+
 	struct thread *curr = thread_current();
 	/* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
 	lock_acquire(&filesys_lock);
@@ -219,6 +225,7 @@ int read (int fd, void *buffer, unsigned size)
 
 int write(int fd, void *buffer, unsigned size)
 {
+
 	struct thread *curr = thread_current();
 	/* 파일에 동시 접근이 일어날 수 있으므로 Lock 사용 */
 	lock_acquire(&filesys_lock);
@@ -274,7 +281,7 @@ int wait (tid_t tid){
 } 
 
 tid_t fork (const char *name, struct intr_frame *if_){
-
+	// check_address(name);
 	/*자식 프로세스 생성 */
 	return process_fork(name, if_);
 }
@@ -284,11 +291,10 @@ tid_t exec(const char *cmd_line, struct intr_frame *if_)
 
 	/* file_name 복사 */
 	char * new_file_name = palloc_get_page(PAL_USER);
-	// if (new_file_name==NULL) exit(-1);
+	if (new_file_name==NULL) exit(-1);
 	strlcpy(new_file_name,cmd_line,PGSIZE);
-
 	/* 함수를 호출하여 자식 프로세스 생성 */
-	process_exec(new_file_name);
+	if (process_exec(new_file_name) == -1) return -1;
 	// /* 생성된 자식 프로세스 검색 */
 	// struct thread *child = get_child_process(tid);
 	// /* 자식 프로세스의 프로그램이 적재될 때까지 대기 */

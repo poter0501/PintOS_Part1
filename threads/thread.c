@@ -246,7 +246,9 @@ thread_create (const char *name, int priority,
 	/* fd 값 초기화(0,1은 표준 입력,출력) */
 	t->next_fd = 2;
 	/* File Descriptor 테이블에 메모리 할당 */
-	t->fdt = calloc (FDCOUNT_LIMIT, sizeof (struct file*));
+	// t->fdt = calloc (FDCOUNT_LIMIT, sizeof (struct file*));
+	t->fdt = palloc_get_multiple (PAL_ZERO,3);
+
 
 	// Project2 System Call
 	/* child process start*/
@@ -555,8 +557,6 @@ init_thread (struct thread *t, const char *name, int priority) {
 	/* child list 초기화 */
 	list_init(&t->child_list);
 
-	/* 메모리 적재 유무 확인 */
-	t->mem_load = 0;
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

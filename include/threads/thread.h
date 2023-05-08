@@ -1,6 +1,6 @@
 #ifndef THREADS_THREAD_H
 #define THREADS_THREAD_H
-#define FDCOUNT_LIMIT 128
+#define FDCOUNT_LIMIT 1500
 
 #include <debug.h>
 #include <list.h>
