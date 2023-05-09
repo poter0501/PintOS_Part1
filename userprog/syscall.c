@@ -146,7 +146,7 @@ exit (int status) {
 	struct thread *curr = thread_current();
 	/* Save exit status at process descriptor -> ??*/
 	curr->exit_status = status;
-	printf("%s: exit(%d)\n", curr->name, status);
+	printf("%s: exit(%d)\n", curr->name, curr->exit_status);
 	thread_exit();
 }
 int
@@ -189,6 +189,11 @@ open (const char *file) {
 		return -1;
 	
 	int fd = process_add_file(file_added);
+	if (fd==-1)
+	{
+		file_close(file_added);
+	}
+	
 	return fd;
 }
 int

@@ -254,6 +254,7 @@ thread_create (const char *name, int priority,
 
 	/* Project2 syscall - file */
 	t->fdt = calloc(MAX_FILE_DES_TBL_SIZE, sizeof(struct file*));
+	// t->fdt = palloc_get_multiple(0, 3);
 	t->next_fd=2;
 
 	/* Add to run queue. */

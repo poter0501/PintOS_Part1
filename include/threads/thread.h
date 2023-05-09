@@ -32,7 +32,7 @@ typedef int tid_t;
 #define PRI_DEFAULT 31                  /* Default priority. */
 #define PRI_MAX 63                      /* Highest priority. */
 
-#define MAX_FILE_DES_TBL_SIZE 128
+#define MAX_FILE_DES_TBL_SIZE 1500
 
 /* A kernel thread or user process.
  *

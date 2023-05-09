@@ -96,15 +96,16 @@ process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	memcpy(&curr->tf_fork, if_, sizeof(struct intr_frame));
 	
 	int child_pid = thread_create (name, PRI_DEFAULT, __do_fork, curr);
-	if (child_pid==-1)
+	if (child_pid==TID_ERROR)
 		return TID_ERROR;
 	
 	struct thread *child_th = get_child_process(child_pid);
+	sema_down(&child_th->sema_load);
 	if (child_th==NULL)
 		return TID_ERROR;
+	if (child_th->exit_status==TID_ERROR)
+		return TID_ERROR;
 	
-	sema_down(&child_th->sema_load);
-
 	return child_pid;
 }
 
@@ -184,8 +185,15 @@ __do_fork (void *aux) {
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
 	 * TODO:       the resources of parent. -> sema를 사용하라는 의미??*/
-	for (int i=2 ; i < parent->next_fd; i++)
+	if (parent->next_fd == MAX_FILE_DES_TBL_SIZE)
 	{
+		goto error;
+	}
+	
+	for (int i=0 ; i < MAX_FILE_DES_TBL_SIZE; i++)
+	{
+		if(i<=2)
+			*(current->fdt+i) = *(parent->fdt+i);
 		struct file *cpy_target = process_get_file_th(parent, i);
 		if(cpy_target != NULL)
 			process_change_file(i, file_duplicate(cpy_target));
@@ -201,7 +209,6 @@ __do_fork (void *aux) {
 		do_iret (&if_);
 
 error:
-	succ=false;
 	current->load_status = 0;
 	sema_up(&current->sema_load);
 	// thread_exit ();
@@ -350,10 +357,10 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
+	process_close_all_file_and_free();
 	file_close(curr->loaded_file);
 	sema_up(&curr->sema_exit);
 	sema_down(&curr->sema_free);
-	process_close_all_file_and_free();
 	process_cleanup ();
 }
 
@@ -439,7 +446,10 @@ int process_add_file(struct file *f)
 	/* Add file to file descriptor table */
 	struct thread *curr = thread_current();
 	struct file **fdt = curr->fdt;
-	int fd = curr->next_fd; 
+	int fd = curr->next_fd;
+	if (fd>=MAX_FILE_DES_TBL_SIZE)
+		return -1;
+	
 	*(fdt + fd) = f;
 	/* Increse the next_fd */
 	curr->next_fd += 1;
@@ -489,6 +499,7 @@ void process_close_all_file_and_free()
 		process_close_file(fd);
 	}
 	free(curr->fdt);
+	// palloc_free_page(curr->fdt);
 }
 /* We load ELF binaries.  The following definitions are taken
  * from the ELF specification, [ELF1], more-or-less verbatim.  */
