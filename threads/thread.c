@@ -13,6 +13,10 @@
 #include "intrinsic.h"
 #ifdef USERPROG
 #include "userprog/process.h"
+#include "./filesys/file.h"
+#include "./filesys/inode.h"
+#include "./filesys/inode.h"
+#include "./filesys/off_t.h"
 #endif
 
 /* Random value for struct thread's `magic' member.
@@ -237,6 +241,21 @@ thread_create (const char *name, int priority,
 	t->tf.ss = SEL_KDSEG;
 	t->tf.cs = SEL_KCSEG;
 	t->tf.eflags = FLAG_IF;
+	
+	/* Project2 syscall */
+	struct thread *parent = thread_current(); /* parent thread ? */
+	t->parent = parent;
+	t->load_status = 0;
+	t->exit_status = 0;
+	sema_init(&t->sema_exit, 0);
+	sema_init(&t->sema_load, 0);
+	sema_init(&t->sema_free, 0);
+	list_push_back (&parent->child, &t->child_elem);
+
+	/* Project2 syscall - file */
+	t->fdt = calloc(MAX_FILE_DES_TBL_SIZE, sizeof(struct file*));
+	// t->fdt = palloc_get_multiple(0, 3);
+	t->next_fd=2;
 
 	/* Add to run queue. */
 	thread_unblock (t);
@@ -319,7 +338,7 @@ thread_tid (void) {
 void
 thread_exit (void) {
 	ASSERT (!intr_context ());
-
+	struct thread *curr = thread_current();
 #ifdef USERPROG
 	process_exit ();
 #endif
@@ -521,6 +540,8 @@ init_thread (struct thread *t, const char *name, int priority) {
 	list_init(&t->donations);
 	t->init_priority = priority;
 	t->wait_on_lock = NULL;
+	/* Project2 syscall - initialize the thread hierachy */
+	list_init(&t->child);
 }
 
 /* Chooses and returns the next thread to be scheduled.  Should

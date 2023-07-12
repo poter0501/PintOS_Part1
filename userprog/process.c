@@ -27,6 +27,15 @@ static bool load (const char *file_name, struct intr_frame *if_);
 static void initd (void *f_name);
 static void __do_fork (void *);
 
+int process_add_file (struct file *f);
+struct file *process_get_file (int fd);
+struct file *process_get_file_th(struct thread *th, int fd);
+void process_close_file (int fd);
+void process_close_all_file_and_free ();
+
+struct thread *get_child_process (int pid);
+void remove_child_process(struct thread *cp);
+
 /* General process initializer for initd and other process. */
 static void
 process_init (void) {
@@ -82,8 +91,22 @@ initd (void *f_name) {
 tid_t
 process_fork (const char *name, struct intr_frame *if_ UNUSED) {
 	/* Clone current thread to new thread.*/
-	return thread_create (name,
-			PRI_DEFAULT, __do_fork, thread_current ());
+	struct thread *curr = thread_current();
+	struct intr_frame parent_tf = curr->tf;
+	memcpy(&curr->tf_fork, if_, sizeof(struct intr_frame));
+	
+	int child_pid = thread_create (name, PRI_DEFAULT, __do_fork, curr);
+	if (child_pid==TID_ERROR)
+		return TID_ERROR;
+	
+	struct thread *child_th = get_child_process(child_pid);
+	sema_down(&child_th->sema_load);
+	if (child_th==NULL)
+		return TID_ERROR;
+	if (child_th->exit_status==TID_ERROR)
+		return TID_ERROR;
+	
+	return child_pid;
 }
 
 #ifndef VM
@@ -98,21 +121,27 @@ duplicate_pte (uint64_t *pte, void *va, void *aux) {
 	bool writable;
 
 	/* 1. TODO: If the parent_page is kernel page, then return immediately. */
+	if (is_kernel_vaddr(va))
+		return true;
 
 	/* 2. Resolve VA from the parent's page map level 4. */
 	parent_page = pml4_get_page (parent->pml4, va);
 
 	/* 3. TODO: Allocate new PAL_USER page for the child and set result to
 	 *    TODO: NEWPAGE. */
+	newpage = palloc_get_page(PAL_ZERO);
 
 	/* 4. TODO: Duplicate parent's page to the new page and
 	 *    TODO: check whether parent's page is writable or not (set WRITABLE
 	 *    TODO: according to the result). */
+	memcpy(newpage, parent_page, PGSIZE);
+	writable = is_writable(pte);
 
 	/* 5. Add new page to child's page table at address VA with WRITABLE
 	 *    permission. */
 	if (!pml4_set_page (current->pml4, va, newpage, writable)) {
 		/* 6. TODO: if fail to insert page, do error handling. */
+		return false;
 	}
 	return true;
 }
@@ -131,8 +160,10 @@ __do_fork (void *aux) {
 	struct intr_frame *parent_if;
 	bool succ = true;
 
+	parent_if = &parent->tf_fork;
 	/* 1. Read the cpu context to local stack. */
 	memcpy (&if_, parent_if, sizeof (struct intr_frame));
+	if_.R.rax = 0;
 
 	/* 2. Duplicate PT */
 	current->pml4 = pml4_create();
@@ -153,15 +184,35 @@ __do_fork (void *aux) {
 	 * TODO: Hint) To duplicate the file object, use `file_duplicate`
 	 * TODO:       in include/filesys/file.h. Note that parent should not return
 	 * TODO:       from the fork() until this function successfully duplicates
-	 * TODO:       the resources of parent.*/
-
-	process_init ();
-
+	 * TODO:       the resources of parent. -> sema를 사용하라는 의미??*/
+	if (parent->next_fd == MAX_FILE_DES_TBL_SIZE)
+	{
+		goto error;
+	}
+	
+	for (int i=0 ; i < MAX_FILE_DES_TBL_SIZE; i++)
+	{
+		if(i<=2)
+			*(current->fdt+i) = *(parent->fdt+i);
+		struct file *cpy_target = process_get_file_th(parent, i);
+		if(cpy_target != NULL)
+			process_change_file(i, file_duplicate(cpy_target));
+			
+	}
+	current->next_fd = parent->next_fd;
+	// current->loaded_file = file_duplicate(parent->loaded_file);
+	// process_init ();
+	current->load_status = 1; // successfully loaded
+	sema_up(&current->sema_load);
 	/* Finally, switch to the newly created process. */
 	if (succ)
 		do_iret (&if_);
+
 error:
-	thread_exit ();
+	current->load_status = 0;
+	sema_up(&current->sema_load);
+	// thread_exit ();
+	exit(TID_ERROR);
 }
 
 // 내용 수정
@@ -196,6 +247,12 @@ process_exec (void *f_name) {
 	/* And then load the binary */
 	success = load (file_name, &_if);
 
+	/* 메모리 적재 완료 시 부모 프로세스 다시 진행 (세마포어 이용) */
+	struct thread *curr = thread_current();
+	sema_up(&curr->sema_load);
+
+	if (!success)
+		return -1;
 	/*2. Push User Stack*/
 	argument_stack(argv , idx , &_if.rsp);
 	_if.R.rsi = (uint64_t )_if.rsp + 8;
@@ -203,14 +260,20 @@ process_exec (void *f_name) {
 
 	/* If load failed, quit. */
 	palloc_free_page (file_name);
+	// if (!success)
+	// {
+	// 	/* 메모리에 적재 실패 시 프로세스 디스크립터에 메모리 적재 실패 구현 */
 
-	if (!success)
-		return -1;
+	// 	thread_exit();
+	// }
 
 	/* hex dump check */
-	hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
+	// hex_dump(_if.rsp, _if.rsp, USER_STACK - _if.rsp, true);
 
+	/* 메모리 적재 성공 시 프로세스 디스크립터에 메모리 적재 성공 */
+	
 	/* Start switched process. */
+	// sema_up(&curr->sema_exit);
 	do_iret (&_if);
 	NOT_REACHED ();
 }
@@ -232,7 +295,57 @@ process_wait (tid_t child_tid UNUSED) {
 	/* XXX: Hint) The pintos exit if process_wait (initd), we recommend you
 	 * XXX:       to add infinite loop here before
 	 * XXX:       implementing the process_wait. */
-	while (1){}
+	// for (int i = 0; i < 100000000; i++);
+
+	/* Exceptions
+	예외 발생시 즉시 -1 리턴
+	1. 자식 프로세스가 exit() 함수를 호출하지 않고,
+	   kernel 의해서 종료된다면(exception), wait(...)은 -1을 반환해야 한다.
+	   -> 프로세스 실행 함수의 마지막 혹은 syscall의 exec 함수의 마지막에 
+	      sema_up을 통해 부모 프로세스에게 신호를 줄텐데
+	      sema_up 까지 도달하지 못하고 죽은 상황을 처리 해줘야 할듯?
+	2. 자식은 상속되지 않는다.
+	   A가 B를 낳고 B가 C를 낳는다면 A가 wait(C) 호출하는 상황은 실패해야 한다.
+	   -> 부모의 자식중에 없다면 -1 을 반환
+	3. 한 자식 프로세서 당 한번만 wait 할 수 있다.
+	   -> 부모가 해당 자식을 이미 wait 중인지 확인하는 로직 필요.
+	   -> wait을 호출한 thread가 해당 자식의 sema_exit의 waiter에 있는지 확인하고 이미 존재하면 -1 return.
+	*/
+
+	/* 자식 프로세스의 프로세스 디스크립터 검색 */
+	/* 자식프로세스가 종료될 때까지 부모 프로세스 대기(세마포어 이용) */
+	/* 자식 프로세스 디스크립터 삭제 */
+	/* 자식 프로세스의 exit status 리턴 */
+	struct thread *curr = thread_current();
+	struct thread *child;
+	struct list_elem *e;
+	bool is_exist = 0;
+	for (e = list_begin(&curr->child); e != list_end(&curr->child); e = list_next(e))
+	{
+		child = list_entry(e, struct thread, child_elem);
+		if(child->tid == child_tid)
+		{
+			is_exist = 1;
+			break;
+		}
+	}
+	if (is_exist)
+	{
+		sema_down(&child->sema_exit);
+		int child_exit_status = child->exit_status;
+		remove_child_process(child);
+		sema_up(&child->sema_free);
+		/*
+		child process 가 exit 되면 process_cleanup 함수 실행되니까
+		child 프로세스 free를 따로 해줘야 하는지 확인 필요
+		 */
+		return child_exit_status;
+	}
+	// else
+	// {
+	// 	for (int i = 0; i < 100000000; i++);
+	// }
+	
 	return -1;
 }
 
@@ -244,7 +357,10 @@ process_exit (void) {
 	 * TODO: Implement process termination message (see
 	 * TODO: project2/process_termination.html).
 	 * TODO: We recommend you to implement process resource cleanup here. */
-
+	process_close_all_file_and_free();
+	file_close(curr->loaded_file);
+	sema_up(&curr->sema_exit);
+	sema_down(&curr->sema_free);
 	process_cleanup ();
 }
 
@@ -252,6 +368,7 @@ process_exit (void) {
 static void
 process_cleanup (void) {
 	struct thread *curr = thread_current ();
+	// process_close_all_file_and_free();
 
 #ifdef VM
 	supplemental_page_table_kill (&curr->spt);
@@ -285,7 +402,105 @@ process_activate (struct thread *next) {
 	/* Set thread's kernel stack for use in processing interrupts. */
 	tss_update (next);
 }
+/* Project2 syscall - process */
+struct thread *get_child_process (int pid)
+{
+	struct thread *curr = thread_current();
+	struct list_elem *e;
+	for (e = list_begin(&curr->child); e != list_end(&curr->child); e = list_next(e))
+	{
+		struct thread *c = list_entry(e, struct thread, child_elem);
+		if(c->tid == pid)
+			return c;
+	}
+	return NULL;
+}
+void remove_child_process(struct thread *cp)
+{
+	struct thread *parent = cp->parent;
+	struct list_elem *e;
+	for (e = list_begin(&parent->child); e != list_end(&parent->child); e = list_next(e))
+	{
+		struct thread *c = list_entry(e, struct thread, child_elem);
+		if(c == cp)
+		{
+			list_remove(e);
+			break;
+		}
+	}
+	/* need to do free child structure memory */
+	
+}
 
+/* Project2 syscall - file */
+void process_change_file(int fd, struct file *f)
+{
+	/* Add file to file descriptor table */
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	// memcpy(fdt + fd, f, sizeof(struct file *));
+	*(fdt + fd) = f;
+}
+int process_add_file(struct file *f)
+{
+	/* Add file to file descriptor table */
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	int fd = curr->next_fd;
+	if (fd>=MAX_FILE_DES_TBL_SIZE)
+		return -1;
+	
+	*(fdt + fd) = f;
+	/* Increse the next_fd */
+	curr->next_fd += 1;
+	return fd;
+}
+struct file *process_get_file(int fd)
+{
+	/* return file, 
+	if fd is not have a file, return NULL */
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	struct file *file = *(fdt + fd);
+	/* Is it need? */
+	if (file==NULL)
+		return NULL;
+	
+	return file;
+}
+struct file *process_get_file_th(struct thread *th, int fd)
+{
+	/* return file, 
+	if fd is not have a file, return NULL */
+	// struct thread *curr = thread_current();
+	struct file **fdt = th->fdt;
+	struct file *file = *(fdt + fd);
+	/* Is it need? */
+	if (file==NULL)
+		return NULL;
+	
+	return file;
+}
+void process_close_file(int fd)
+{
+	struct thread *curr = thread_current();
+	struct file **fdt = curr->fdt;
+	struct file *file = *(fdt + fd);
+	/* Close the file */
+	file_close(file); /* free file */
+	/* Initialize the table entry */
+	*(fdt + fd) = NULL;
+}
+void process_close_all_file_and_free()
+{
+	struct thread *curr = thread_current();
+	for (int fd = 2; fd < MAX_FILE_DES_TBL_SIZE; fd++)
+	{
+		process_close_file(fd);
+	}
+	free(curr->fdt);
+	// palloc_free_page(curr->fdt);
+}
 /* We load ELF binaries.  The following definitions are taken
  * from the ELF specification, [ELF1], more-or-less verbatim.  */
 
@@ -417,7 +632,8 @@ load (const char *file_name, struct intr_frame *if_) {
 		printf ("load: %s: error loading executable\n", file_name);
 		goto done;
 	}
-
+	file_deny_write (file);
+	t->loaded_file = file;
 	/* Read program headers. */
 	file_ofs = ehdr.e_phoff;
 	for (i = 0; i < ehdr.e_phnum; i++) {
@@ -483,10 +699,12 @@ load (const char *file_name, struct intr_frame *if_) {
 
 
 	success = true;
+	// file_deny_write (file);
+	// t->loaded_file = file;
 
 done:
 	/* We arrive here whether the load is successful or not. */
-	file_close (file);
+	// file_close (file);
 	return success;
 }
 
